@@ -6,19 +6,21 @@ const client = new MercadoPagoConfig({ accessToken: process.env.MERCADO_PAGO_ACC
 export async function POST(request) {
   try {
     const { items } = await request.json();
+    const host = request.headers.get('origin') || 'http://localhost:3000';
 
     const preference = new Preference(client);
     const result = await preference.create({
       body: {
         items: items.map(item => ({
           title: item.name,
-          quantity: item.quantity,
+          quantity: Number(item.quantity),
           unit_price: Number(item.price),
           currency_id: 'ARS',
         })),
         back_urls: {
-          success: 'http://localhost:3000',
-          failure: 'http://localhost:3000',
+          success: `${host}`,
+          failure: `${host}`,
+          pending: `${host}`,
         },
         auto_return: 'approved',
       },
@@ -26,6 +28,7 @@ export async function POST(request) {
 
     return NextResponse.json({ url: result.init_point });
   } catch (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error detallado de Mercado Pago:", error);
+    return NextResponse.json({ error: error.message || "Error desconocido" }, { status: 500 });
   }
 }
