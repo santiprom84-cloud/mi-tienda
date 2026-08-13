@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
-import { MercadoPagoConfig, Preference } from 'mercadopago';
+import MercadoPagoConfig, { Preference } from 'mercadopago';
 
-const client = new MercadoPagoConfig({ accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN });
+// Configuración compatible con la SDK oficial
+const client = new MercadoPagoConfig({ 
+  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN 
+});
 
 export async function POST(request) {
   try {
