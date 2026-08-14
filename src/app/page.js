@@ -10,13 +10,12 @@ export default function HomePage() {
   // Estados para los filtros
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('TODOS');
-  const [sortOrder, setSortOrder] = useState('default'); // 'default', 'asc' (menor a mayor), 'desc' (mayor a menor)
+  const [sortOrder, setSortOrder] = useState('default'); 
   
-  // Estados para manejar la carga y los errores
+  // Estados de carga
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Traer productos de Supabase
   useEffect(() => {
     const fetchProductos = async () => {
       try {
@@ -49,7 +48,7 @@ export default function HomePage() {
     fetchProductos();
   }, []);
 
-  // 1. Primero filtramos por texto y categoría
+  // 1. Lógica de Filtrado
   let filteredProducts = catalog.filter(product => {
     const matchesCategory = selectedCategory === 'TODOS' || product.category === selectedCategory;
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -57,13 +56,19 @@ export default function HomePage() {
     return matchesCategory && matchesSearch;
   });
 
-  // 2. Luego ordenamos el resultado según el precio
+  // 2. Lógica de Ordenamiento
   if (sortOrder === 'asc') {
     filteredProducts.sort((a, b) => Number(a.price) - Number(b.price));
   } else if (sortOrder === 'desc') {
     filteredProducts.sort((a, b) => Number(b.price) - Number(a.price));
   }
-  // Si es 'default', se queda con el orden original de la base de datos (los más nuevos primero)
+
+  // 3. Lógica para la sección "Destacados"
+  // Solo mostramos destacados si el usuario NO está buscando ni filtrando activamente
+  const isDefaultView = searchQuery === '' && selectedCategory === 'TODOS' && sortOrder === 'default';
+  
+  // Tomamos los primeros 4 productos (los más recientes agregados a la base de datos)
+  const featuredProducts = catalog.slice(0, 4);
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-8 mt-4">
@@ -78,11 +83,27 @@ export default function HomePage() {
         </p>
       </div>
 
+      {/* SECCIÓN NUEVA: Productos Destacados (Solo visible en la vista por defecto) */}
+      {!loading && !error && isDefaultView && featuredProducts.length > 0 && (
+        <div className="mb-16">
+          <div className="flex items-center gap-4 mb-8">
+            <span className="text-4xl animate-pulse">🔥</span>
+            <h2 className="text-3xl font-black text-gray-100 uppercase tracking-wider">
+              Novedades Destacadas
+            </h2>
+            <div className="flex-grow h-1 bg-gradient-to-r from-[#FF9980] to-transparent rounded-full opacity-50"></div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+            {featuredProducts.map(product => (
+              <ProductCard key={`featured-${product.id}`} product={product} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Controles de búsqueda, orden y filtros */}
       <div className="bg-gray-800 p-4 sm:p-6 rounded-3xl shadow-xl border border-gray-700 mb-10 sticky top-20 z-40 flex flex-col gap-4">
-        
         <div className="flex flex-col md:flex-row gap-4 justify-between items-center w-full">
-          {/* Buscador de texto */}
           <div className="relative w-full md:w-2/3">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
@@ -99,7 +120,6 @@ export default function HomePage() {
             />
           </div>
 
-          {/* Selector de Orden por Precio */}
           <div className="w-full md:w-1/3 flex items-center gap-3">
             <label className="text-gray-400 font-bold text-sm hidden lg:block whitespace-nowrap">
               Ordenar:
@@ -124,7 +144,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Botones de Categorías */}
         <div className="flex flex-wrap gap-2 w-full justify-start pt-4 border-t border-gray-700">
           {categories.map(category => (
             <button
@@ -143,7 +162,14 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Manejo de Estados: Cargando, Error o Grilla */}
+      {/* Título dinámico para el resto del catálogo */}
+      {!loading && !error && (
+        <h3 className="text-xl font-bold text-gray-400 mb-6 px-2">
+          {isDefaultView ? 'Catálogo Completo' : 'Resultados de tu búsqueda'}
+        </h3>
+      )}
+
+      {/* Grilla Principal de Productos */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20">
           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#FF9980]"></div>
