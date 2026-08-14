@@ -1,46 +1,51 @@
-import { supabase } from '@/lib/supabase';
 import ProductCard from '@/components/ProductCard';
 
-export default async function Home() {
-  // Pedimos los datos a Supabase desde el servidor
-  const { data: products, error } = await supabase
-    .from('products')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error("Error detallado de Supabase:", error);
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="bg-red-50 p-6 rounded-xl border border-red-200 text-red-700 shadow-sm max-w-md text-center">
-          <h2 className="font-bold text-xl mb-2">Error de conexión</h2>
-          <p className="text-sm">No se pudieron cargar los productos. Verificá que la URL en .env.local esté correcta.</p>
-        </div>
-      </main>
-    );
+// Catálogo de prueba con precios en $100 para testear pasarela de pagos
+const dummyProducts = [
+  {
+    id: '1',
+    name: 'Teclado Mecánico TKL Creamy',
+    description: 'Teclado formato TKL con switches lineales cremosos. Ideal para tipear y jugar al máximo nivel.',
+    price: 100, // Precio de prueba
+    category: 'TECNOLOGÍA',
+    image: 'https://images.unsplash.com/photo-1595225476474-87563907a212?q=80&w=600&auto=format&fit=crop'
+  },
+  {
+    id: '2',
+    name: 'Camiseta Oficial Talleres',
+    description: 'Camiseta titular. Tela transpirable de alta tecnología y escudo termosellado.',
+    price: 100, // Precio de prueba
+    category: 'INDUMENTARIA',
+    image: 'https://images.unsplash.com/photo-1508344928928-7137b2938833?q=80&w=600&auto=format&fit=crop'
+  },
+  {
+    id: '3',
+    name: 'Volante Sim Racing',
+    description: 'Volante con Force Feedback de alta precisión para disfrutar al máximo en simuladores de carreras.',
+    price: 100, // Precio de prueba
+    category: 'GAMING',
+    image: 'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?q=80&w=600&auto=format&fit=crop'
   }
+];
 
+export default function HomePage() {
   return (
-    <main className="min-h-screen bg-slate-50 py-12 px-6">
-      <div className="max-w-7xl mx-auto">
-        
-        <header className="mb-12 text-center">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4 tracking-tight">
-          <span className="text-blue-600">Polirubro</span>
-          </h1>
-          <p className="text-lg text-slate-500 max-w-2xl mx-auto">
-            Explorá nuestro catálogo completo. Los mejores productos estan aca.
-          </p>
-        </header>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {/* Iteramos sobre los productos y pasamos cada uno al componente visual */}
-          {products?.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
-
+    <div className="max-w-6xl mx-auto p-4 sm:p-8 mt-6">
+      <div className="text-center mb-12">
+        <h1 className="text-4xl md:text-5xl font-black text-[#FF9980] mb-4 drop-shadow-sm">
+          Polirubro Online
+        </h1>
+        <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+          Explorá nuestro catálogo completo. Los mejores productos actualizados en tiempo real.
+        </p>
       </div>
-    </main>
+      
+      {/* Grilla de productos adaptada a tu diseño */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+        {dummyProducts.map(product => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </div>
+    </div>
   );
 }
