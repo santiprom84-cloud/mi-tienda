@@ -10,14 +10,12 @@ export default function CartPage() {
   const [errorMessage, setErrorMessage] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Calculamos el total limpiando puntos de los miles
   const total = cart.reduce((acc, item) => {
     const cleanPrice = Number(String(item.price).replace(/\./g, '').replace(',', '.'));
     return acc + (cleanPrice * Number(item.quantity || 1));
   }, 0);
 
   const handleWhatsAppCheckout = async () => {
-    // 1. Validamos que el cliente haya puesto su nombre
     if (!customerName.trim()) {
       setErrorMessage("Por favor, ingresá tu nombre para confirmar el pedido.");
       return;
@@ -27,11 +25,9 @@ export default function CartPage() {
     setIsProcessing(true);
 
     try {
-      // 2. Generamos un código de pedido único (Ej: CBA-8492)
       const randomNumbers = Math.floor(1000 + Math.random() * 9000);
       const orderCode = `CBA-${randomNumbers}`;
 
-      // 3. Guardamos el pedido en Supabase a través de nuestra nueva API
       const response = await fetch('/api/pedidos', {
         method: 'POST',
         headers: {
@@ -45,14 +41,17 @@ export default function CartPage() {
         }),
       });
 
+      // Extraemos la respuesta real de la base de datos
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("No pudimos registrar tu pedido en el sistema. Intentá de nuevo.");
+        // Ahora arrojamos el error EXACTO que nos devuelve Supabase o nuestra API
+        throw new Error(data.error || "Error desconocido en el servidor al guardar el pedido.");
       }
 
-      // 4. CONFIGURÁ TU NÚMERO DE WHATSAPP AQUÍ
+      // CONFIGURÁ TU NÚMERO DE WHATSAPP AQUÍ
       const phoneNumber = "5493518089416"; 
 
-      // 5. Armamos el mensaje automático INCLUYENDO EL CÓDIGO
       let message = `¡Hola Polirubro Online! Mi nombre es *${customerName.trim()}* y quiero confirmar mi pedido *#${orderCode}*:\n\n`;
       
       cart.forEach(item => {
@@ -62,13 +61,13 @@ export default function CartPage() {
 
       message += `\n*Total a pagar: $${total.toLocaleString('es-AR')}*\n\n¿Me confirman si hay stock para realizar el pago?`;
 
-      // 6. Abrimos WhatsApp
       const whatsappUrl = `https://wa.me/${5493518089416}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
 
     } catch (error) {
       console.error("Error al procesar el pedido:", error);
-      setErrorMessage(error.message);
+      // Mostramos el error real en la pantalla
+      setErrorMessage(`Fallo técnico: ${error.message}`);
     } finally {
       setIsProcessing(false);
     }
@@ -122,7 +121,6 @@ export default function CartPage() {
           })}
         </ul>
         
-        {/* Panel para pedir el nombre del cliente */}
         <div className="bg-gray-850 p-6 sm:p-8 border-t border-gray-700">
           <label htmlFor="customerName" className="block text-gray-300 font-bold mb-2">
             ¿Quién realiza la compra?
@@ -137,11 +135,12 @@ export default function CartPage() {
             disabled={isProcessing}
           />
           {errorMessage && (
-            <p className="text-red-400 text-sm mt-2 font-bold animate-pulse">⚠️ {errorMessage}</p>
+            <p className="text-red-400 text-sm mt-2 font-bold bg-red-900/30 p-3 rounded-lg border border-red-500/50">
+              ⚠️ {errorMessage}
+            </p>
           )}
         </div>
 
-        {/* Total y botón de WhatsApp */}
         <div className="bg-gray-900 p-6 sm:p-10 border-t border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-8">
           <div className="text-center sm:text-left">
             <p className="text-gray-400 font-bold text-xl mb-1 uppercase tracking-wider">Total a pagar</p>
