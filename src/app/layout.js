@@ -1,27 +1,22 @@
-import "./globals.css";
-import { CartProvider } from "@/context/CartContext";
-import Navbar from "@/components/Navbar";
-import CartSidebar from "@/components/CartSidebar";
+import './globals.css';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 
 export const metadata = {
-  title: "DevTienda Polirubro",
-  description: "Tu tienda online con los mejores productos.",
+  title: 'Polirubro Online.cba | Córdoba Capital',
+  description: 'Tu tienda polirubro de confianza con envíos desde Córdoba Capital. Todo lo que buscas en un solo lugar.',
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
-      <body className="bg-slate-50 text-slate-900 antialiased flex flex-col min-h-screen">
-        <CartProvider>
-          <Navbar />
-          
-          {/* Añadimos el componente del carrito lateral aquí */}
-          <CartSidebar />
-          
-          <div className="flex-grow">
-            {children}
-          </div>
-        </CartProvider>
+      <body className="bg-gray-50 flex flex-col min-h-screen">
+        <Navbar />
+        {/* El main toma el espacio disponible para empujar el footer hacia abajo */}
+        <main className="flex-grow">
+          {children}
+        </main>
+        <Footer />
       </body>
     </html>
   );
