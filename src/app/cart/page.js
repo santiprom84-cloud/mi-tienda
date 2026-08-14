@@ -41,11 +41,20 @@ export default function CartPage() {
         }),
       });
 
-      // Extraemos la respuesta real de la base de datos
-      const data = await response.json();
+      // 1. BLINDAJE: Leemos la respuesta como texto crudo primero
+      const textResponse = await response.text();
+      
+      let data;
+      try {
+        // 2. Intentamos convertir ese texto a JSON
+        data = JSON.parse(textResponse);
+      } catch (err) {
+        // 3. Si falla (es decir, devolvió un HTML), lanzamos un error claro
+        console.error("Respuesta cruda del servidor:", textResponse);
+        throw new Error("El servidor no encontró la API (Error 404). Verificá que exista el archivo src/app/api/pedidos/route.js");
+      }
 
       if (!response.ok) {
-        // Ahora arrojamos el error EXACTO que nos devuelve Supabase o nuestra API
         throw new Error(data.error || "Error desconocido en el servidor al guardar el pedido.");
       }
 
@@ -66,7 +75,6 @@ export default function CartPage() {
 
     } catch (error) {
       console.error("Error al procesar el pedido:", error);
-      // Mostramos el error real en la pantalla
       setErrorMessage(`Fallo técnico: ${error.message}`);
     } finally {
       setIsProcessing(false);
