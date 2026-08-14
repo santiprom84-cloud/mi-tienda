@@ -13,20 +13,23 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
+      {/* El fondo general del cuerpo sigue siendo oscuro (bg-gray-900) */}
       <body className={`${inter.className} bg-gray-900 text-gray-100 min-h-screen flex flex-col`}>
         <CartProvider>
-          {/* El Navbar ahora aparecerá en absolutamente todas las páginas */}
+          {/* El Navbar salmón que acabamos de actualizar */}
           <Navbar />
           
-          {/* El contenido dinámico de cada página (Inicio, Carrito, etc.) */}
           <main className="flex-grow">
             {children}
           </main>
           
-          {/* Footer minimalista y universal */}
-          <footer className="bg-gray-950 border-t border-gray-800 py-8 text-center mt-auto">
-            <p className="text-gray-500 font-medium">
-              © {new Date().getFullYear()} Polirubro Online.cba - Córdoba Capital
+          {/* El Footer pintado de salmón para cerrar el diseño */}
+          <footer className="bg-[#FF9980] border-t border-[#ff8060] py-8 text-center mt-auto shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <p className="text-gray-900 font-black text-xl mb-1">
+              © {new Date().getFullYear()} Polirubro Online.cba
+            </p>
+            <p className="text-gray-800 font-bold flex items-center justify-center gap-2">
+              <span>📍</span> Centro de operaciones en Córdoba Capital
             </p>
           </footer>
         </CartProvider>
