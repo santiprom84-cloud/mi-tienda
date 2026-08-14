@@ -1,64 +1,57 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ProductCard from '@/components/ProductCard';
 
-// Catálogo inicial de productos
-const catalog = [
-  {
-    id: '1',
-    name: 'Teclado Mecánico Aula F75 Creamy',
-    description: 'Teclado formato 75% con switches lineales cremosos. Sonido espectacular, ideal para tipear apuntes y jugar al máximo nivel.',
-    price: 95000,
-    category: 'TECNOLOGÍA',
-    image: 'https://images.unsplash.com/photo-1595225476474-87563907a212?q=80&w=600&auto=format&fit=crop'
-  },
-  {
-    id: '2',
-    name: 'Camiseta Oficial Talleres',
-    description: 'Camiseta titular. Tela transpirable de alta tecnología y escudo termosellado. Para alentar en cada partido.',
-    price: 55000,
-    category: 'INDUMENTARIA',
-    image: 'https://images.unsplash.com/photo-1508344928928-7137b2938833?q=80&w=600&auto=format&fit=crop'
-  },
-  {
-    id: '3',
-    name: 'Volante Sim Racing Force Feedback',
-    description: 'Volante de alta precisión para simuladores de carreras como Assetto Corsa. Inmersión y sensibilidad total en la pista.',
-    price: 250000,
-    category: 'GAMING',
-    image: 'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?q=80&w=600&auto=format&fit=crop'
-  },
-  {
-    id: '4',
-    name: 'Pantalón Baggy Oversize',
-    description: 'Pantalón estilo baggy súper cómodo. Tela resistente, bolsillos amplios y corte ancho, ideal para el día a día.',
-    price: 35000,
-    category: 'INDUMENTARIA',
-    image: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?q=80&w=600&auto=format&fit=crop'
-  },
-  {
-    id: '5',
-    name: 'Tablet para Apuntes Digitales',
-    description: 'Pantalla de alta resolución y compatibilidad con lápiz óptico. Perfecta para tomar notas en la facu o ver streams.',
-    price: 180000,
-    category: 'TECNOLOGÍA',
-    image: 'https://images.unsplash.com/photo-1585790050230-5dd28404ccb9?q=80&w=600&auto=format&fit=crop'
-  }
-];
-
-// Extraemos las categorías únicas automáticamente del catálogo
-const categories = ['TODOS', ...new Set(catalog.map(p => p.category))];
-
 export default function HomePage() {
+  const [catalog, setCatalog] = useState([]);
+  const [categories, setCategories] = useState(['TODOS']);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('TODOS');
+  
+  // Estados para manejar la carga y los errores
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // useEffect se ejecuta apenas el cliente entra a la página para ir a buscar los productos a Supabase
+  useEffect(() => {
+    const fetchProductos = async () => {
+      try {
+        const response = await fetch('/api/productos');
+        const textResponse = await response.text();
+        
+        let data;
+        try {
+          data = JSON.parse(textResponse);
+        } catch (err) {
+          throw new Error("Error conectando con la API de productos.");
+        }
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Error al cargar el catálogo');
+        }
+
+        setCatalog(data.productos);
+        
+        // Extraemos las categorías únicas de lo que devuelva la base de datos
+        const uniqueCategories = ['TODOS', ...new Set(data.productos.map(p => p.category))];
+        setCategories(uniqueCategories);
+
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false); // Apagamos la animación de carga
+      }
+    };
+
+    fetchProductos();
+  }, []);
 
   // Lógica de filtrado doble (por texto y por categoría)
   const filteredProducts = catalog.filter(product => {
     const matchesCategory = selectedCategory === 'TODOS' || product.category === selectedCategory;
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          product.description.toLowerCase().includes(searchQuery.toLowerCase());
+                          (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesCategory && matchesSearch;
   });
 
@@ -91,7 +84,8 @@ export default function HomePage() {
               placeholder="Buscar productos..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-600 text-gray-100 rounded-xl pl-11 pr-4 py-3 focus:outline-none focus:border-[#FF9980] focus:ring-1 focus:ring-[#FF9980] transition-colors"
+              disabled={loading || error !== null}
+              className="w-full bg-gray-900 border border-gray-600 text-gray-100 rounded-xl pl-11 pr-4 py-3 focus:outline-none focus:border-[#FF9980] focus:ring-1 focus:ring-[#FF9980] transition-colors disabled:opacity-50"
             />
           </div>
 
@@ -101,7 +95,8 @@ export default function HomePage() {
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                disabled={loading || error !== null}
+                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 ${
                   selectedCategory === category 
                     ? 'bg-[#FF9980] text-gray-900 shadow-md' 
                     : 'bg-gray-900 text-gray-400 hover:text-gray-200 border border-gray-700 hover:border-gray-500'
@@ -111,12 +106,22 @@ export default function HomePage() {
               </button>
             ))}
           </div>
-
         </div>
       </div>
 
-      {/* Grilla de resultados */}
-      {filteredProducts.length > 0 ? (
+      {/* Manejo de Estados: Cargando, Error o Grilla */}
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#FF9980]"></div>
+          <p className="text-[#FF9980] font-bold mt-4 animate-pulse">Cargando catálogo...</p>
+        </div>
+      ) : error ? (
+        <div className="text-center py-20 bg-gray-800 rounded-3xl border border-red-500/50">
+          <span className="text-6xl block mb-4">⚠️</span>
+          <h2 className="text-2xl font-bold text-red-400">Oops, algo salió mal</h2>
+          <p className="text-gray-400 mt-2">{error}</p>
+        </div>
+      ) : filteredProducts.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
           {filteredProducts.map(product => (
             <ProductCard key={product.id} product={product} />
