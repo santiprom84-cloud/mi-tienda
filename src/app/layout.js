@@ -4,15 +4,15 @@ import Footer from '@/components/Footer';
 import { CartProvider } from '@/context/CartContext';
 
 export const metadata = {
-  title: 'Polirubro Online.cba | Córdoba Capital',
-  description: 'Tu tienda polirubro de confianza con envíos desde Córdoba Capital. Todo lo que buscas en un solo lugar.',
+  title: 'Polirubroonline.com.ar | Córdoba Capital',
+  description: 'Tu tienda polirubro de confianza con envíos desde Córdoba Capital.',
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
-      <body className="bg-gray-50 flex flex-col min-h-screen">
-        {/* Envolvemos todo en el CartProvider para que el carrito funcione */}
+      {/* Acá aplicamos un color salmón un poquito más claro para el fondo (bg-[#FFB099]) */}
+      <body className="bg-[#FFB099] flex flex-col min-h-screen text-gray-900">
         <CartProvider>
           <Navbar />
           <main className="flex-grow">

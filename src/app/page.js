@@ -26,10 +26,10 @@ export default async function Home() {
         
         <header className="mb-12 text-center">
           <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4 tracking-tight">
-            DevTienda <span className="text-blue-600">Polirubro</span>
+          <span className="text-blue-600">Polirubro</span>
           </h1>
           <p className="text-lg text-slate-500 max-w-2xl mx-auto">
-            Explorá nuestro catálogo completo. Los mejores productos actualizados en tiempo real.
+            Explorá nuestro catálogo completo. Los mejores productos estan aca.
           </p>
         </header>
 
