@@ -5,7 +5,7 @@ import { useCart } from '@/context/CartContext';
 import Link from 'next/link';
 
 export default function ProductDetailPage({ params }) {
-  // Desempaquetamos los params usando "use()" de React
+  // Desempaquetamos los params usando "use()" de React para Next.js 14+
   const unwrappedParams = use(params);
   const id = unwrappedParams.id;
 
@@ -18,7 +18,17 @@ export default function ProductDetailPage({ params }) {
     const fetchProduct = async () => {
       try {
         const response = await fetch(`/api/productos/${id}`);
-        const data = await response.json();
+        
+        // BLINDAJE: Leemos el texto crudo para evitar que explote si Vercel manda HTML
+        const textResponse = await response.text();
+        
+        let data;
+        try {
+          data = JSON.parse(textResponse);
+        } catch (err) {
+          console.error("Respuesta cruda del servidor:", textResponse);
+          throw new Error("No se encontró la API de búsqueda. Verificá que exista el archivo exacto: src/app/api/productos/[id]/route.js");
+        }
 
         if (!response.ok) {
           throw new Error(data.error || 'No se pudo cargar el producto');
@@ -51,7 +61,7 @@ export default function ProductDetailPage({ params }) {
       <div className="max-w-2xl mx-auto p-8 text-center mt-10 bg-gray-800 rounded-3xl border border-gray-700 shadow-xl">
         <span className="text-6xl block mb-4">📦</span>
         <h1 className="text-3xl font-black text-gray-100 mb-4">Producto no encontrado</h1>
-        <p className="text-gray-400 mb-8">{error || "El artículo que buscás ya no está disponible."}</p>
+        <p className="text-red-400 mb-8 font-bold">{error || "El artículo que buscás ya no está disponible."}</p>
         <Link href="/" className="bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black py-3 px-8 rounded-full transition-all">
           Volver a la tienda
         </Link>
@@ -63,12 +73,15 @@ export default function ProductDetailPage({ params }) {
 
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-8 mt-4">
+      {/* Botón de volver */}
       <Link href="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-[#FF9980] font-bold mb-8 transition-colors">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         Volver al catálogo
       </Link>
 
       <div className="bg-gray-800 rounded-3xl shadow-2xl border border-gray-700 overflow-hidden flex flex-col md:flex-row">
+        
+        {/* Lado izquierdo: Imagen grande */}
         <div className="md:w-1/2 h-80 md:h-auto bg-gray-900 relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img 
@@ -83,6 +96,7 @@ export default function ProductDetailPage({ params }) {
           </div>
         </div>
 
+        {/* Lado derecho: Info y compra */}
         <div className="md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
           <h1 className="text-3xl md:text-5xl font-black text-gray-100 mb-6 leading-tight">
             {product.name}
