@@ -1,56 +1,47 @@
 import { NextResponse } from 'next/server';
+import { MercadoPagoConfig, Preference } from 'mercadopago';
 
 export async function POST(request) {
   try {
-    const { items } = await request.json();
-    const host = request.headers.get('origin') || 'https://polirubrocba.vercel.app';
+    const body = await request.json();
+    const { items } = body;
 
-    // Formateamos los productos para evitar que Mercado Pago rechace la petición
-    const formattedItems = items.map(item => {
-      // Si el precio viene como "55.000", le sacamos el punto para que sea 55000 matemático
+    // Inicializamos el cliente con la variable de entorno que ya tenías configurada en Vercel
+    const client = new MercadoPagoConfig({ 
+      accessToken: process.env.MP_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MP_ACCESS_TOKEN 
+    });
+
+    const preferenceItems = items.map(item => {
       const cleanPrice = Number(String(item.price).replace(/\./g, '').replace(',', '.'));
-      
       return {
-        title: item.name || 'Producto',
-        quantity: Number(item.quantity) || 1,
+        id: item.id || 'item-id',
+        title: item.name,
+        quantity: Number(item.quantity || 1),
         unit_price: cleanPrice,
         currency_id: 'ARS',
       };
     });
 
-    const preferenceData = {
-      items: formattedItems,
-      back_urls: {
-        success: `${host}/`,
-        failure: `${host}/cart`,
-        pending: `${host}/`,
-      },
-      auto_return: 'approved',
-    };
+    // Detectamos automáticamente la URL de tu página (sea localhost para pruebas o vercel en producción)
+    const baseUrl = request.headers.get('origin') || 'https://polirubrocba.vercel.app';
 
-    const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.MERCADO_PAGO_ACCESS_TOKEN}`,
-      },
-      body: JSON.stringify(preferenceData),
+    const preference = new Preference(client);
+    const result = await preference.create({
+      body: {
+        items: preferenceItems,
+        // ACÁ ESTÁ LA MAGIA: Las URLs de retorno
+        back_urls: {
+          success: `${baseUrl}/gracias`,
+          failure: `${baseUrl}/`,
+          pending: `${baseUrl}/gracias`,
+        },
+        auto_return: 'approved', // Redirige solo automáticamente si el pago se aprueba en el acto
+      }
     });
 
-    const data = await response.json();
-
-    // Si Mercado Pago nos rebota, capturamos el motivo exacto
-    if (!response.ok) {
-      console.error("Rechazado por Mercado Pago:", data);
-      return NextResponse.json({ 
-        error: "Mercado Pago rechazó el pago", 
-        details: data 
-      }, { status: response.status });
-    }
-
-    return NextResponse.json({ url: data.init_point });
+    return NextResponse.json({ url: result.init_point });
   } catch (error) {
-    console.error("Error interno del servidor:", error);
-    return NextResponse.json({ error: error.message || "Error desconocido" }, { status: 500 });
+    console.error('Error al crear preferencia de Mercado Pago:', error);
+    return NextResponse.json({ error: 'Error interno al conectar con Mercado Pago' }, { status: 500 });
   }
 }
