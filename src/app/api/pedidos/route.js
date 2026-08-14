@@ -6,7 +6,7 @@ export async function POST(request) {
     const body = await request.json();
     const { codigo_pedido, nombre_cliente, productos, total } = body;
 
-    // Guardamos el pedido en la tabla 'pedidos' que acabamos de crear
+    // Guardamos el pedido en la tabla 'pedidos' de Supabase
     const { data, error } = await supabase
       .from('pedidos')
       .insert([
@@ -15,19 +15,20 @@ export async function POST(request) {
           nombre_cliente, 
           productos, 
           total, 
-          estado: 'pendiente' // Nace pendiente hasta que vos lo confirmes
+          estado: 'pendiente' 
         }
       ])
       .select();
 
     if (error) {
       console.error("Error de Supabase:", error);
-      throw error;
+      // Devolvemos el error exacto de la base de datos al frontend
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({ success: true, pedido: data[0] });
   } catch (error) {
     console.error('Error guardando pedido:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Fallo interno en el servidor: " + error.message }, { status: 500 });
   }
 }
