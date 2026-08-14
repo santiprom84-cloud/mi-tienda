@@ -10,7 +10,6 @@ export default function PagarPage() {
   const [errorBusqueda, setErrorBusqueda] = useState(null);
   const [loadingPago, setLoadingPago] = useState(false);
 
-  // Función para buscar el pedido en la base de datos
   const buscarPedido = async (e) => {
     e.preventDefault();
     if (!codigo.trim()) return;
@@ -19,7 +18,7 @@ export default function PagarPage() {
     setErrorBusqueda(null);
     setPedido(null);
 
-    // Formateamos para asegurar que tenga el formato CBA-XXXX
+    // Limpiamos el código para asegurarnos de que el formato sea correcto
     let codigoLimpio = codigo.trim().toUpperCase();
     if (!codigoLimpio.startsWith('CBA-') && !codigoLimpio.startsWith('#')) {
       codigoLimpio = `CBA-${codigoLimpio}`;
@@ -28,10 +27,17 @@ export default function PagarPage() {
 
     try {
       const response = await fetch(`/api/pedidos/${codigoLimpio}`);
-      const data = await response.json();
+      const textResponse = await response.text();
+      
+      let data;
+      try {
+        data = JSON.parse(textResponse);
+      } catch (err) {
+        throw new Error("Error de conexión con la base de datos al buscar el pedido.");
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al buscar el pedido');
+        throw new Error(data.error || 'No pudimos encontrar tu pedido.');
       }
 
       setPedido(data.pedido);
@@ -42,11 +48,9 @@ export default function PagarPage() {
     }
   };
 
-  // Función para enviar a Mercado Pago
   const handlePagar = async () => {
     setLoadingPago(true);
     try {
-      // Reutilizamos tu API de checkout que ya funciona perfecto
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,7 +63,7 @@ export default function PagarPage() {
         throw new Error(data.details?.message || data.error || 'Error de conexión con Mercado Pago');
       }
 
-      // Redirigimos a la pasarela
+      // Redirigimos a la pasarela de pagos
       window.location.href = data.url;
     } catch (error) {
       alert(`Hubo un error al iniciar el pago: ${error.message}`);
@@ -97,7 +101,7 @@ export default function PagarPage() {
             </div>
             
             {errorBusqueda && (
-              <p className="text-red-400 bg-red-900/30 p-4 rounded-lg font-bold text-center animate-pulse">
+              <p className="text-red-400 bg-red-900/30 p-4 rounded-lg font-bold text-center border border-red-500/50">
                 ⚠️ {errorBusqueda}
               </p>
             )}
@@ -112,7 +116,7 @@ export default function PagarPage() {
           </form>
         </div>
       ) : (
-        <div className="bg-gray-800 rounded-3xl shadow-xl border border-[#FF9980]/50 overflow-hidden animate-fade-in-up">
+        <div className="bg-gray-800 rounded-3xl shadow-xl border border-[#FF9980]/50 overflow-hidden">
           <div className="bg-gray-900 p-6 text-center border-b border-gray-700">
             <h2 className="text-gray-400 font-bold uppercase tracking-widest text-sm mb-1">Pedido Encontrado</h2>
             <p className="text-3xl font-black text-gray-100 uppercase">#{pedido.codigo_pedido}</p>

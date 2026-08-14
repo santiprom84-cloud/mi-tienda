@@ -24,6 +24,6 @@ export async function GET(request, { params }) {
     return NextResponse.json({ success: true, pedido: data });
   } catch (error) {
     console.error('Error buscando pedido:', error);
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+    return NextResponse.json({ error: "Error interno del servidor al buscar el pedido." }, { status: 500 });
   }
 }
