@@ -1,46 +1,59 @@
-'use client'; // Agregamos esto porque ahora el Navbar necesita leer datos en tiempo real
+'use client';
 
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
+import { useState, useEffect } from 'react';
 
 export default function Navbar() {
   const { cart } = useCart();
-  
-  // Sumamos la cantidad de todos los productos que hay en el carrito
-  const totalItems = cart.reduce((total, item) => total + (item.quantity || 1), 0);
+  const [mounted, setMounted] = useState(false);
+
+  // Evitamos errores de hidratación en Next.js esperando a que el componente cargue
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Calculamos la cantidad total de artículos en el carrito
+  const totalItems = cart.reduce((acc, item) => acc + Number(item.quantity || 1), 0);
 
   return (
-    <nav className="bg-[#FF9980] shadow-md p-4 flex items-center justify-between sticky top-0 z-50">
-      <Link href="/" className="flex items-center">
-        <span className="text-2xl md:text-3xl font-black text-red-700 tracking-tight">
-          Polirubroonline.com.ar
-        </span>
-      </Link>
-      
-      <div className="flex items-center gap-4 sm:gap-6">
-        <span className="hidden sm:flex items-center gap-1 text-red-900 font-bold text-sm bg-white/30 px-3 py-1 rounded-full">
-          📍 Córdoba Capital
-        </span>
-        <Link href="/" className="hidden sm:block text-red-800 hover:text-red-600 font-bold transition-colors">
-          Inicio
-        </Link>
-        
-        {/* Botón del Carrito con el contador */}
-        <Link href="/cart" className="relative text-red-900 hover:bg-white/40 font-bold flex items-center gap-2 bg-white/30 px-3 py-2 rounded-lg transition-all">
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="9" cy="21" r="1"></circle>
-            <circle cx="20" cy="21" r="1"></circle>
-            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-          </svg>
-          <span className="hidden sm:block">Carrito</span>
+    <nav className="bg-gray-900/95 backdrop-blur-md border-b border-gray-800 sticky top-0 z-50 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-20">
           
-          {/* El loguito con el número (solo aparece si hay más de 0 productos) */}
-          {totalItems > 0 && (
-            <span className="absolute -top-2 -right-2 bg-red-700 text-white text-xs font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-[#FF9980] shadow-sm animate-bounce">
-              {totalItems}
-            </span>
-          )}
-        </Link>
+          {/* Logo / Link al Inicio */}
+          <div className="flex-shrink-0 flex items-center">
+            <Link href="/" className="group flex items-center gap-2">
+              <span className="text-3xl transition-transform group-hover:scale-110">🏪</span>
+              <span className="font-black text-2xl tracking-tight text-gray-100 group-hover:text-[#FF9980] transition-colors">
+                Polirubro<span className="text-[#FF9980]">Online</span>
+              </span>
+            </Link>
+          </div>
+
+          {/* Menú de la derecha (Carrito) */}
+          <div className="flex items-center gap-6">
+            <Link 
+              href="/cart" 
+              className="relative p-3 bg-gray-800 hover:bg-gray-700 rounded-full transition-colors border border-gray-700 hover:border-[#FF9980] group"
+              title="Ver mi carrito"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300 group-hover:text-[#FF9980] transition-colors">
+                <circle cx="9" cy="21" r="1"></circle>
+                <circle cx="20" cy="21" r="1"></circle>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+              </svg>
+              
+              {/* Burbuja contadora de productos */}
+              {mounted && totalItems > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-black w-6 h-6 flex items-center justify-center rounded-full shadow-lg animate-bounce-short border-2 border-gray-900">
+                  {totalItems}
+                </span>
+              )}
+            </Link>
+          </div>
+
+        </div>
       </div>
     </nav>
   );
