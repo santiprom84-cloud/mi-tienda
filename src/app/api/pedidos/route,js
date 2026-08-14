@@ -1,0 +1,33 @@
+import { NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
+
+export async function POST(request) {
+  try {
+    const body = await request.json();
+    const { codigo_pedido, nombre_cliente, productos, total } = body;
+
+    // Guardamos el pedido en la tabla 'pedidos' que acabamos de crear
+    const { data, error } = await supabase
+      .from('pedidos')
+      .insert([
+        { 
+          codigo_pedido, 
+          nombre_cliente, 
+          productos, 
+          total, 
+          estado: 'pendiente' // Nace pendiente hasta que vos lo confirmes
+        }
+      ])
+      .select();
+
+    if (error) {
+      console.error("Error de Supabase:", error);
+      throw error;
+    }
+
+    return NextResponse.json({ success: true, pedido: data[0] });
+  } catch (error) {
+    console.error('Error guardando pedido:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
