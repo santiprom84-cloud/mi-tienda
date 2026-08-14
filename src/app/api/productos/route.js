@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+// ESTA LÍNEA ES LA MAGIA: Obliga a Vercel a consultar la base de datos en tiempo real siempre
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     // Buscamos todos los productos en Supabase ordenados por los más nuevos primero
