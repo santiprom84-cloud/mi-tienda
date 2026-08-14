@@ -11,8 +11,8 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="es">
-      {/* Acá aplicamos un color salmón un poquito más claro para el fondo (bg-[#FFB099]) */}
-      <body className="bg-[#FFB099] flex flex-col min-h-screen text-gray-900">
+      {/* Aplicamos el fondo oscuro estético y letras claras */}
+      <body className="bg-gray-900 flex flex-col min-h-screen text-gray-100">
         <CartProvider>
           <Navbar />
           <main className="flex-grow">
