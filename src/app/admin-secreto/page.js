@@ -15,8 +15,6 @@ export default function AdminPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
-  
-  // Nuevo estado para saber si estamos editando (guarda el ID) o creando (null)
   const [editingId, setEditingId] = useState(null);
 
   // === ESTADOS PARA CARGA MASIVA ===
@@ -27,8 +25,10 @@ export default function AdminPage() {
   // === ESTADOS PARA LA LISTA DE INVENTARIO ===
   const [inventory, setInventory] = useState([]);
   const [loadingInventory, setLoadingInventory] = useState(true);
+  
+  // NUEVO ESTADO: Buscador del inventario
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // FUNCIÓN: Traer los productos actuales de la base de datos
   const fetchInventory = async () => {
     setLoadingInventory(true);
     const { data, error } = await supabase
@@ -36,29 +36,24 @@ export default function AdminPage() {
       .select('*');
       
     if (!error && data) {
-      // Los damos vuelta para ver los más nuevos arriba
       setInventory(data.reverse());
     }
     setLoadingInventory(false);
   };
 
-  // Cargar inventario al entrar a la página
   useEffect(() => {
     fetchInventory();
   }, []);
 
-  // FUNCIÓN: Subir producto (Nuevo o Editado)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     setMessage('');
 
     try {
-      // Limpiamos el precio por si alguien le pone un punto o un signo pesos
       const cleanPrice = Number(String(product.price).replace(/[^0-9]/g, ''));
       
       if (editingId) {
-        // MODO EDICIÓN (UPDATE)
         const { error } = await supabase
           .from('productos')
           .update({
@@ -72,9 +67,8 @@ export default function AdminPage() {
 
         if (error) throw error;
         setMessage('✅ Producto actualizado con éxito.');
-        setEditingId(null); // Salimos del modo edición
+        setEditingId(null);
       } else {
-        // MODO CREACIÓN (INSERT)
         const { error } = await supabase
           .from('productos')
           .insert([{
@@ -89,7 +83,6 @@ export default function AdminPage() {
         setMessage('✅ Producto publicado con éxito.');
       }
 
-      // Limpiamos el formulario y recargamos la tabla de abajo
       setProduct({ name: '', price: '', image: '', category: '', description: '' });
       fetchInventory();
       
@@ -97,12 +90,10 @@ export default function AdminPage() {
       setMessage(`❌ Error: ${error.message}`);
     } finally {
       setIsSubmitting(false);
-      // Borramos el mensaje de éxito a los 3 segundos
       setTimeout(() => setMessage(''), 3000);
     }
   };
 
-  // FUNCIÓN: Cargar datos en el formulario para editar
   const handleEditClick = (item) => {
     setEditingId(item.id);
     setProduct({
@@ -113,18 +104,15 @@ export default function AdminPage() {
       description: item.description || ''
     });
     setMessage('✏️ Modo edición activado. Modificá los datos y guardá.');
-    // Hacemos scroll hacia arriba suavemente
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // FUNCIÓN: Cancelar Edición
   const handleCancelEdit = () => {
     setEditingId(null);
     setProduct({ name: '', price: '', image: '', category: '', description: '' });
     setMessage('');
   };
 
-  // FUNCIÓN: Borrar Producto (DELETE)
   const handleDeleteClick = async (id, name) => {
     const confirmDelete = window.confirm(`¿Estás 100% seguro de que querés borrar el producto "${name}"? Esta acción no se puede deshacer.`);
     if (!confirmDelete) return;
@@ -136,15 +124,12 @@ export default function AdminPage() {
         .eq('id', id);
 
       if (error) throw error;
-      
-      // Actualizamos la lista
       fetchInventory();
     } catch (error) {
       alert(`Error al borrar: ${error.message}`);
     }
   };
 
-  // FUNCIÓN: Carga Masiva (Excel)
   const handleBulkSubmit = async () => {
     if (!excelData.trim()) {
       setBulkMessage('⚠️ Pegá los datos de tu Excel primero.');
@@ -174,7 +159,7 @@ export default function AdminPage() {
 
       setBulkMessage(`✅ ¡Éxito! Se cargaron ${productsToAdd.length} productos.`);
       setExcelData('');
-      fetchInventory(); // Recargamos el inventario
+      fetchInventory(); 
     } catch (error) {
       setBulkMessage(`❌ Error: ${error.message}`);
     } finally {
@@ -182,6 +167,12 @@ export default function AdminPage() {
       setTimeout(() => setBulkMessage(''), 5000);
     }
   };
+
+  // NUEVA LÓGICA: Filtramos el inventario según lo que escriba el usuario en el buscador
+  const filteredInventory = inventory.filter(item => 
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    item.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-8 mt-4 mb-20">
@@ -304,18 +295,36 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* ZONA DE INVENTARIO (Listado con Borrar y Editar) */}
+      {/* ZONA DE INVENTARIO */}
       <div className="bg-gray-800 p-6 sm:p-8 rounded-3xl border border-gray-700 shadow-xl">
-        <h2 className="text-2xl font-black text-gray-100 mb-6 flex items-center gap-2">
-          <span>📋</span> Inventario Actual ({inventory.length})
-        </h2>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <h2 className="text-2xl font-black text-gray-100 flex items-center gap-2">
+            <span>📋</span> Inventario Actual ({filteredInventory.length})
+          </h2>
+          
+          {/* BUSCADOR DE INVENTARIO */}
+          <div className="relative w-full md:w-1/3">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar en inventario..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-600 text-gray-100 rounded-xl pl-10 pr-4 py-2 focus:outline-none focus:border-[#FF9980] focus:ring-1 focus:ring-[#FF9980] transition-colors"
+            />
+          </div>
+        </div>
         
         {loadingInventory ? (
           <div className="flex justify-center py-10">
             <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-[#FF9980]"></div>
           </div>
-        ) : inventory.length === 0 ? (
-          <p className="text-gray-400 text-center py-10">No hay productos en la base de datos.</p>
+        ) : filteredInventory.length === 0 ? (
+          <p className="text-gray-400 text-center py-10">No se encontraron productos con esa búsqueda.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -329,7 +338,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700/50">
-                {inventory.map((item) => (
+                {filteredInventory.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-700/30 transition-colors">
                     <td className="p-4">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -340,7 +349,6 @@ export default function AdminPage() {
                     <td className="p-4 font-mono text-gray-300">${item.price.toLocaleString('es-AR')}</td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-3">
-                        {/* Botón EDITAR */}
                         <button 
                           onClick={() => handleEditClick(item)}
                           className="bg-gray-900 border border-gray-600 hover:border-blue-500 hover:text-blue-400 text-gray-400 p-2 rounded-lg transition-colors"
@@ -348,7 +356,6 @@ export default function AdminPage() {
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                         </button>
-                        {/* Botón BORRAR */}
                         <button 
                           onClick={() => handleDeleteClick(item.id, item.name)}
                           className="bg-gray-900 border border-gray-600 hover:border-red-500 hover:text-red-400 text-gray-400 p-2 rounded-lg transition-colors"
