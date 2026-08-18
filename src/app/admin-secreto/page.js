@@ -13,6 +13,11 @@ export default function AdminPage() {
     category: '',
     description: ''
   });
+  
+  // NUEVOS ESTADOS PARA LA IMAGEN
+  const [imageFile, setImageFile] = useState(null); // Guarda el archivo físico
+  const [imagePreview, setImagePreview] = useState(''); // Muestra la foto antes de subirla
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [editingId, setEditingId] = useState(null);
@@ -25,8 +30,6 @@ export default function AdminPage() {
   // === ESTADOS PARA LA LISTA DE INVENTARIO ===
   const [inventory, setInventory] = useState([]);
   const [loadingInventory, setLoadingInventory] = useState(true);
-  
-  // NUEVO ESTADO: Buscador del inventario
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchInventory = async () => {
@@ -45,21 +48,66 @@ export default function AdminPage() {
     fetchInventory();
   }, []);
 
+  // FUNCIÓN: Manejar la selección de imagen
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      // Creamos un link temporal para que puedas ver la foto en pantalla antes de subirla
+      setImagePreview(URL.createObjectURL(file)); 
+    }
+  };
+
+  // FUNCIÓN: Subir producto (Nuevo o Editado) con la imagen física
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     setMessage('');
 
     try {
+      let finalImageUrl = product.image; // Por defecto, mantenemos la URL actual (si estamos editando)
+
+      // SI EL USUARIO SELECCIONÓ UNA FOTO NUEVA, LA SUBIMOS A SUPABASE STORAGE PRIMERO
+      if (imageFile) {
+        // Generamos un nombre único para la foto usando la fecha exacta para que no haya duplicados
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        
+        // 1. Subimos el archivo físico al balde 'productos'
+        const { error: uploadError } = await supabase.storage
+          .from('productos')
+          .upload(fileName, imageFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          throw new Error(`Error subiendo la imagen: ${uploadError.message}`);
+        }
+
+        // 2. Le pedimos a Supabase el Link Directo Público de esa foto
+        const { data: { publicUrl } } = supabase.storage
+          .from('productos')
+          .getPublicUrl(fileName);
+
+        finalImageUrl = publicUrl; // Reemplazamos la URL con la nueva de nuestro servidor
+      }
+
+      // Validamos que haya una imagen sí o sí
+      if (!finalImageUrl) {
+        throw new Error('Por favor, seleccioná o subí una imagen.');
+      }
+
       const cleanPrice = Number(String(product.price).replace(/[^0-9]/g, ''));
       
       if (editingId) {
+        // MODO EDICIÓN
         const { error } = await supabase
           .from('productos')
           .update({
             name: product.name,
             price: cleanPrice,
-            image: product.image,
+            image: finalImageUrl,
             category: product.category.toUpperCase(),
             description: product.description
           })
@@ -69,12 +117,13 @@ export default function AdminPage() {
         setMessage('✅ Producto actualizado con éxito.');
         setEditingId(null);
       } else {
+        // MODO CREACIÓN
         const { error } = await supabase
           .from('productos')
           .insert([{
             name: product.name,
             price: cleanPrice,
-            image: product.image,
+            image: finalImageUrl,
             category: product.category.toUpperCase(),
             description: product.description
           }]);
@@ -83,14 +132,17 @@ export default function AdminPage() {
         setMessage('✅ Producto publicado con éxito.');
       }
 
+      // Limpiamos los estados
       setProduct({ name: '', price: '', image: '', category: '', description: '' });
+      setImageFile(null);
+      setImagePreview('');
       fetchInventory();
       
     } catch (error) {
       setMessage(`❌ Error: ${error.message}`);
     } finally {
       setIsSubmitting(false);
-      setTimeout(() => setMessage(''), 3000);
+      setTimeout(() => setMessage(''), 5000);
     }
   };
 
@@ -103,6 +155,9 @@ export default function AdminPage() {
       category: item.category,
       description: item.description || ''
     });
+    // Limpiamos la foto nueva temporal al editar
+    setImageFile(null);
+    setImagePreview('');
     setMessage('✏️ Modo edición activado. Modificá los datos y guardá.');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -110,20 +165,30 @@ export default function AdminPage() {
   const handleCancelEdit = () => {
     setEditingId(null);
     setProduct({ name: '', price: '', image: '', category: '', description: '' });
+    setImageFile(null);
+    setImagePreview('');
     setMessage('');
   };
 
-  const handleDeleteClick = async (id, name) => {
+  const handleDeleteClick = async (id, name, imageUrl) => {
     const confirmDelete = window.confirm(`¿Estás 100% seguro de que querés borrar el producto "${name}"? Esta acción no se puede deshacer.`);
     if (!confirmDelete) return;
 
     try {
-      const { error } = await supabase
+      // 1. Borramos el producto de la base de datos
+      const { error: dbError } = await supabase
         .from('productos')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (dbError) throw dbError;
+
+      // 2. Borramos la foto física de Supabase Storage para no ocupar espacio
+      if (imageUrl && imageUrl.includes('supabase.co')) {
+        const fileName = imageUrl.split('/').pop();
+        await supabase.storage.from('productos').remove([fileName]);
+      }
+
       fetchInventory();
     } catch (error) {
       alert(`Error al borrar: ${error.message}`);
@@ -148,7 +213,7 @@ export default function AdminPage() {
         return {
           name: columns[0].trim(),
           price: Number(columns[1].replace(/[^0-9]/g, '')),
-          image: columns[2].trim(),
+          image: columns[2].trim(), // Para Excel seguimos usando links web si los tenés
           category: columns[3].trim().toUpperCase(),
           description: columns[4].trim()
         };
@@ -168,7 +233,6 @@ export default function AdminPage() {
     }
   };
 
-  // NUEVA LÓGICA: Filtramos el inventario según lo que escriba el usuario en el buscador
   const filteredInventory = inventory.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     item.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -177,7 +241,6 @@ export default function AdminPage() {
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-8 mt-4 mb-20">
       
-      {/* HEADER DEL PANEL */}
       <div className="flex justify-between items-center mb-10 bg-gray-800 p-6 rounded-3xl border border-gray-700 shadow-xl">
         <div>
           <h1 className="text-4xl font-black text-[#FF9980] mb-2">Centro de Control</h1>
@@ -188,10 +251,9 @@ export default function AdminPage() {
         </Link>
       </div>
 
-      {/* ZONA DE CARGA (Masiva e Individual) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
         
-        {/* COLUMNA 1: Carga Masiva */}
+        {/* CARGA MASIVA */}
         <div className="bg-gray-800 p-6 sm:p-8 rounded-3xl border border-gray-700 shadow-xl flex flex-col h-full">
           <h2 className="text-2xl font-black text-gray-100 mb-2 flex items-center gap-2">
             <span>⚡</span> Carga Masiva (Excel)
@@ -219,90 +281,121 @@ export default function AdminPage() {
           )}
         </div>
 
-        {/* COLUMNA 2: Formulario Individual / EDICIÓN */}
-        <div className={`p-6 sm:p-8 rounded-3xl border shadow-xl transition-colors ${editingId ? 'bg-blue-900/20 border-blue-500/50' : 'bg-gray-800 border-gray-700'}`}>
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-black text-gray-100 flex items-center gap-2">
-              <span>{editingId ? '✏️' : '📦'}</span> {editingId ? 'Editando Producto' : 'Carga Individual'}
-            </h2>
-            {editingId && (
-              <button onClick={handleCancelEdit} className="text-red-400 hover:text-red-300 text-sm font-bold underline">
-                Cancelar edición
-              </button>
-            )}
+        {/* CARGA INDIVIDUAL CON SOLTAR IMAGEN */}
+        <div className={`p-6 sm:p-8 rounded-3xl border shadow-xl transition-colors flex flex-col justify-between ${editingId ? 'bg-blue-900/20 border-blue-500/50' : 'bg-gray-800 border-gray-700'}`}>
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-black text-gray-100 flex items-center gap-2">
+                <span>{editingId ? '✏️' : '📦'}</span> {editingId ? 'Editando Producto' : 'Carga Individual'}
+              </h2>
+              {editingId && (
+                <button onClick={handleCancelEdit} className="text-red-400 hover:text-red-300 text-sm font-bold underline">
+                  Cancelar edición
+                </button>
+              )}
+            </div>
+            
+            <form id="productForm" onSubmit={handleSubmit} className="flex flex-col gap-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-400 font-bold mb-2 text-sm">Nombre</label>
+                  <input 
+                    type="text" required value={product.name}
+                    onChange={(e) => setProduct({...product, name: e.target.value})}
+                    className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-400 font-bold mb-2 text-sm">Precio (solo n°)</label>
+                  <input 
+                    type="number" required value={product.price}
+                    onChange={(e) => setProduct({...product, price: e.target.value})}
+                    className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980]"
+                  />
+                </div>
+              </div>
+
+              {/* ZONA DE ARRASTRAR Y SOLTAR IMAGEN */}
+              <div>
+                <label className="block text-gray-400 font-bold mb-2 text-sm">Imagen del producto</label>
+                <div className="relative border-2 border-dashed border-gray-600 bg-gray-900/50 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:border-[#FF9980] hover:bg-gray-900 transition-all cursor-pointer min-h-[160px] overflow-hidden group">
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    title="Arrastrá o hacé clic para buscar foto"
+                  />
+                  
+                  {imagePreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={imagePreview} alt="Preview" className="absolute inset-0 w-full h-full object-contain p-2" />
+                  ) : product.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={product.image} alt="Actual" className="absolute inset-0 w-full h-full object-contain p-2" />
+                  ) : (
+                    <div className="text-gray-400 group-hover:text-[#FF9980] transition-colors pointer-events-none">
+                      <span className="text-4xl block mb-2">📸</span>
+                      <p className="font-bold">Arrastrá tu foto acá o hacé clic para buscar</p>
+                      <p className="text-xs mt-1">Soporta JPG, PNG, WEBP</p>
+                    </div>
+                  )}
+                  
+                  {/* Etiqueta flotante para indicar que se puede cambiar la foto si ya hay una */}
+                  {(imagePreview || product.image) && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <p className="text-white font-bold bg-[#FF9980]/90 px-4 py-2 rounded-full pointer-events-none">Cambiar imagen</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-gray-400 font-bold mb-2 text-sm">Categoría</label>
+                  <input 
+                    type="text" required value={product.category}
+                    onChange={(e) => setProduct({...product, category: e.target.value})}
+                    className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] uppercase"
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-400 font-bold mb-2 text-sm">Descripción</label>
+                  <textarea 
+                    required rows="3" value={product.description}
+                    onChange={(e) => setProduct({...product, description: e.target.value})}
+                    className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] resize-none"
+                  ></textarea>
+                </div>
+              </div>
+            </form>
           </div>
-          
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-gray-400 font-bold mb-2 text-sm">Nombre</label>
-                <input 
-                  type="text" required value={product.name}
-                  onChange={(e) => setProduct({...product, name: e.target.value})}
-                  className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980]"
-                />
-              </div>
-              <div>
-                <label className="block text-gray-400 font-bold mb-2 text-sm">Precio (solo n°)</label>
-                <input 
-                  type="number" required value={product.price}
-                  onChange={(e) => setProduct({...product, price: e.target.value})}
-                  className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980]"
-                />
-              </div>
-            </div>
 
-            <div>
-              <label className="block text-gray-400 font-bold mb-2 text-sm">Link Imagen (URL .jpg/.png)</label>
-              <input 
-                type="url" required value={product.image}
-                onChange={(e) => setProduct({...product, image: e.target.value})}
-                className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-gray-400 font-bold mb-2 text-sm">Categoría</label>
-              <input 
-                type="text" required value={product.category}
-                onChange={(e) => setProduct({...product, category: e.target.value})}
-                className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] uppercase"
-              />
-            </div>
-
-            <div>
-              <label className="block text-gray-400 font-bold mb-2 text-sm">Descripción</label>
-              <textarea 
-                required rows="3" value={product.description}
-                onChange={(e) => setProduct({...product, description: e.target.value})}
-                className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] resize-none"
-              ></textarea>
-            </div>
-
+          <div className="mt-6">
             <button 
+              form="productForm"
               type="submit" disabled={isSubmitting}
-              className={`w-full font-black py-4 rounded-xl shadow-md transition-all mt-2 disabled:opacity-50 text-gray-900 ${editingId ? 'bg-blue-400 hover:bg-blue-500' : 'bg-[#FF9980] hover:bg-[#ff8060]'}`}
+              className={`w-full font-black py-4 rounded-xl shadow-md transition-all disabled:opacity-50 text-gray-900 ${editingId ? 'bg-blue-400 hover:bg-blue-500' : 'bg-[#FF9980] hover:bg-[#ff8060]'}`}
             >
-              {isSubmitting ? 'Guardando...' : (editingId ? 'Guardar Cambios' : 'Publicar Producto')}
+              {isSubmitting ? 'Guardando imagen y producto...' : (editingId ? 'Guardar Cambios' : 'Publicar Producto')}
             </button>
 
             {message && (
-              <div className={`mt-2 p-3 rounded-xl text-center font-bold text-sm ${message.includes('✅') ? 'bg-green-900/50 text-green-400 border border-green-800' : (message.includes('✏️') ? 'bg-blue-900/50 text-blue-400 border border-blue-800' : 'bg-red-900/50 text-red-400 border border-red-800')}`}>
+              <div className={`mt-3 p-3 rounded-xl text-center font-bold text-sm ${message.includes('✅') ? 'bg-green-900/50 text-green-400 border border-green-800' : (message.includes('✏️') ? 'bg-blue-900/50 text-blue-400 border border-blue-800' : 'bg-red-900/50 text-red-400 border border-red-800')}`}>
                 {message}
               </div>
             )}
-          </form>
+          </div>
         </div>
       </div>
 
-      {/* ZONA DE INVENTARIO */}
+      {/* INVENTARIO */}
       <div className="bg-gray-800 p-6 sm:p-8 rounded-3xl border border-gray-700 shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <h2 className="text-2xl font-black text-gray-100 flex items-center gap-2">
             <span>📋</span> Inventario Actual ({filteredInventory.length})
           </h2>
           
-          {/* BUSCADOR DE INVENTARIO */}
           <div className="relative w-full md:w-1/3">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
@@ -357,7 +450,7 @@ export default function AdminPage() {
                           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                         </button>
                         <button 
-                          onClick={() => handleDeleteClick(item.id, item.name)}
+                          onClick={() => handleDeleteClick(item.id, item.name, item.image)}
                           className="bg-gray-900 border border-gray-600 hover:border-red-500 hover:text-red-400 text-gray-400 p-2 rounded-lg transition-colors"
                           title="Borrar"
                         >
