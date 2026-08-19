@@ -12,9 +12,9 @@ export default function CheckoutSuccessPage({ params }) {
   const [loading, setLoading] = useState(true);
 
   // === ⚠️ DATOS IMPORTANTES A MODIFICAR ⚠️ ===
-  const MI_ALIAS = "tu.alias.mp"; // Poné acá tu alias de Mercado Pago o banco
+  const MI_ALIAS = "santimarquez."; // Poné acá tu alias de Mercado Pago o banco
   const MI_TITULAR = "Santiago Alejo Márquez"; // Tu nombre
-  const MI_WHATSAPP = "5493510000000"; // Tu número de WhatsApp (Código de país + área sin 0 + número sin 15)
+  const MI_WHATSAPP = "5493518089416"; // Tu número de WhatsApp (Código de país + área sin 0 + número sin 15)
   // ==========================================
 
   useEffect(() => {
