@@ -9,33 +9,31 @@ export default function PerfilPage() {
   const { user, loadingAuth, logout } = useAuth();
   const router = useRouter();
 
-  // Estados del formulario
+  // Estados del Formulario de Perfil
   const [profile, setProfile] = useState({
-    full_name: '',
-    dni: '',
-    phone: '',
-    address: '',
-    city: '',
-    postal_code: ''
+    full_name: '', dni: '', phone: '', address: '', city: '', postal_code: ''
   });
-
-  const [loading, setLoading] = useState(true);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
 
-  // Redirigir si no está logueado y cargar datos si lo está
+  // Estados del Historial de Pedidos
+  const [orders, setOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+
   useEffect(() => {
     if (!loadingAuth && !user) {
       router.push('/login');
     } else if (user) {
       fetchProfile();
+      fetchOrders();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loadingAuth, router]);
 
   const fetchProfile = async () => {
-    setLoading(true);
+    setLoadingProfile(true);
     try {
       const { data, error } = await supabase
         .from('perfiles')
@@ -43,24 +41,36 @@ export default function PerfilPage() {
         .eq('id', user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 significa "no se encontró la fila", lo cual es normal si es un usuario nuevo
-        throw error;
-      }
-
+      if (error && error.code !== 'PGRST116') throw error;
+      
       if (data) {
         setProfile({
-          full_name: data.full_name || '',
-          dni: data.dni || '',
-          phone: data.phone || '',
-          address: data.address || '',
-          city: data.city || '',
-          postal_code: data.postal_code || ''
+          full_name: data.full_name || '', dni: data.dni || '', phone: data.phone || '',
+          address: data.address || '', city: data.city || '', postal_code: data.postal_code || ''
         });
       }
     } catch (err) {
       console.error('Error cargando perfil:', err.message);
     } finally {
-      setLoading(false);
+      setLoadingProfile(false);
+    }
+  };
+
+  const fetchOrders = async () => {
+    setLoadingOrders(true);
+    try {
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (err) {
+      console.error('Error cargando pedidos:', err.message);
+    } finally {
+      setLoadingOrders(false);
     }
   };
 
@@ -71,16 +81,8 @@ export default function PerfilPage() {
     setError(null);
 
     try {
-      const updates = {
-        id: user.id,
-        ...profile,
-        updated_at: new Date()
-      };
-
-      // Upsert: Si el perfil existe lo actualiza, si no existe lo crea.
-      const { error } = await supabase
-        .from('perfiles')
-        .upsert(updates, { returning: 'minimal' });
+      const updates = { id: user.id, ...profile, updated_at: new Date() };
+      const { error } = await supabase.from('perfiles').upsert(updates, { returning: 'minimal' });
 
       if (error) throw error;
       setMessage('✅ Datos guardados con éxito. ¡Ya estás listo para comprar!');
@@ -88,7 +90,7 @@ export default function PerfilPage() {
       setError(`Error al guardar: ${err.message}`);
     } finally {
       setSaving(false);
-      setTimeout(() => setMessage(null), 4000); // Borra el mensaje de éxito a los 4 segundos
+      setTimeout(() => setMessage(null), 4000);
     }
   };
 
@@ -97,7 +99,26 @@ export default function PerfilPage() {
     router.push('/');
   };
 
-  if (loadingAuth || loading) {
+  // Funciones de formato visual para los pedidos
+  const formatDate = (dateString) => {
+    const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    return new Date(dateString).toLocaleDateString('es-AR', options);
+  };
+
+  const getStatusBadge = (status) => {
+    switch(status) {
+      case 'pendiente':
+        return <span className="bg-yellow-900/50 text-yellow-400 border border-yellow-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Pendiente</span>;
+      case 'pagado':
+        return <span className="bg-green-900/50 text-green-400 border border-green-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Pagado / Preparando</span>;
+      case 'enviado':
+        return <span className="bg-blue-900/50 text-blue-400 border border-blue-800 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Enviado</span>;
+      default:
+        return <span className="bg-gray-700 text-gray-300 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">{status}</span>;
+    }
+  };
+
+  if (loadingAuth || loadingProfile) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center">
         <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#FF9980]"></div>
@@ -106,20 +127,19 @@ export default function PerfilPage() {
     );
   }
 
-  // Si por algún motivo no hay usuario, no mostramos nada (el useEffect lo va a redirigir)
   if (!user) return null;
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-8 mt-4 mb-20">
+    <div className="max-w-7xl mx-auto p-4 sm:p-8 mt-4 mb-20">
       
-      {/* Cabecera del Perfil */}
+      {/* CABECERA GENERAL */}
       <div className="flex flex-col sm:flex-row justify-between items-center mb-10 bg-gray-800 p-6 sm:p-8 rounded-3xl border border-gray-700 shadow-xl gap-4">
         <div className="flex items-center gap-4 text-center sm:text-left">
           <div className="bg-gray-900 p-4 rounded-full border-2 border-[#FF9980] shadow-inner">
             <span className="text-4xl">👤</span>
           </div>
           <div>
-            <h1 className="text-3xl font-black text-gray-100">Mi Perfil</h1>
+            <h1 className="text-3xl font-black text-gray-100">Mi Panel</h1>
             <p className="text-gray-400 text-sm font-mono mt-1">{user.email}</p>
           </div>
         </div>
@@ -133,120 +153,113 @@ export default function PerfilPage() {
         </button>
       </div>
 
-      {/* Formulario de Datos */}
-      <div className="bg-gray-800 p-6 sm:p-10 rounded-3xl border border-gray-700 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#FF9980]/20 via-[#FF9980] to-[#FF9980]/20"></div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        <div className="mb-8">
-          <h2 className="text-2xl font-black text-white flex items-center gap-2">
-            <span>📦</span> Datos de Envío y Facturación
-          </h2>
-          <p className="text-gray-400 mt-2">
-            Completá estos datos una sola vez para que tus futuras compras en Polirubro Online sean mucho más rápidas.
-          </p>
-        </div>
+        {/* COLUMNA IZQUIERDA: Formulario de Datos (Ocupa 5/12 en PC) */}
+        <div className="lg:col-span-5 h-fit bg-gray-800 p-6 sm:p-8 rounded-3xl border border-gray-700 shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#FF9980]/20 via-[#FF9980] to-[#FF9980]/20"></div>
+          
+          <div className="mb-8 border-b border-gray-700 pb-4">
+            <h2 className="text-xl font-black text-white flex items-center gap-2">
+              <span>📦</span> Datos de Envío
+            </h2>
+          </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Nombre Completo */}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div>
               <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Nombre y Apellido</label>
-              <input
-                type="text" required
-                value={profile.full_name}
-                onChange={(e) => setProfile({...profile, full_name: e.target.value})}
-                className="w-full bg-gray-900 border border-gray-600 rounded-xl p-4 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors"
-                placeholder="Ej: Juan Pérez"
-              />
+              <input type="text" required value={profile.full_name} onChange={(e) => setProfile({...profile, full_name: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors"/>
             </div>
 
-            {/* DNI */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">DNI / CUIL</label>
+                <input type="text" required value={profile.dni} onChange={(e) => setProfile({...profile, dni: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors" />
+              </div>
+              <div>
+                <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Teléfono</label>
+                <input type="tel" required value={profile.phone} onChange={(e) => setProfile({...profile, phone: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors" />
+              </div>
+            </div>
+
             <div>
-              <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">DNI / CUIL</label>
-              <input
-                type="text" required
-                value={profile.dni}
-                onChange={(e) => setProfile({...profile, dni: e.target.value})}
-                className="w-full bg-gray-900 border border-gray-600 rounded-xl p-4 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors"
-                placeholder="Sin puntos ni espacios"
-              />
+              <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Dirección de Entrega</label>
+              <input type="text" required value={profile.address} onChange={(e) => setProfile({...profile, address: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors" placeholder="Calle, Número, Depto"/>
             </div>
 
-            {/* Teléfono */}
-            <div>
-              <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Teléfono de Contacto</label>
-              <input
-                type="tel" required
-                value={profile.phone}
-                onChange={(e) => setProfile({...profile, phone: e.target.value})}
-                className="w-full bg-gray-900 border border-gray-600 rounded-xl p-4 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors"
-                placeholder="Ej: 351 1234567"
-              />
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2">
+                <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Ciudad / Barrio</label>
+                <input type="text" required value={profile.city} onChange={(e) => setProfile({...profile, city: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors" />
+              </div>
+              <div>
+                <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">C.P.</label>
+                <input type="text" required value={profile.postal_code} onChange={(e) => setProfile({...profile, postal_code: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors" />
+              </div>
             </div>
 
-            {/* Código Postal */}
-            <div>
-              <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Código Postal</label>
-              <input
-                type="text" required
-                value={profile.postal_code}
-                onChange={(e) => setProfile({...profile, postal_code: e.target.value})}
-                className="w-full bg-gray-900 border border-gray-600 rounded-xl p-4 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors"
-                placeholder="Ej: 5000"
-              />
+            <div className="mt-4">
+              <button type="submit" disabled={saving} className="w-full bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black py-4 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none">
+                {saving ? 'Guardando...' : 'Guardar Mis Datos'}
+              </button>
             </div>
 
-            {/* Dirección (Ocupa las dos columnas) */}
-            <div className="md:col-span-2">
-              <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Dirección de Entrega (Calle, Número, Depto)</label>
-              <input
-                type="text" required
-                value={profile.address}
-                onChange={(e) => setProfile({...profile, address: e.target.value})}
-                className="w-full bg-gray-900 border border-gray-600 rounded-xl p-4 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors"
-                placeholder="Ej: Av. Colón 1234, Piso 2, Depto B"
-              />
-            </div>
+            {error && <div className="bg-red-900/50 text-red-400 border border-red-800 p-3 rounded-xl font-bold text-sm text-center">{error}</div>}
+            {message && <div className="bg-green-900/50 text-green-400 border border-green-800 p-3 rounded-xl font-bold text-sm text-center">{message}</div>}
+          </form>
+        </div>
 
-            {/* Ciudad (Ocupa las dos columnas) */}
-            <div className="md:col-span-2">
-              <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Ciudad / Barrio</label>
-              <input
-                type="text" required
-                value={profile.city}
-                onChange={(e) => setProfile({...profile, city: e.target.value})}
-                className="w-full bg-gray-900 border border-gray-600 rounded-xl p-4 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors"
-                placeholder="Ej: Córdoba Capital - Barrio Nueva Córdoba"
-              />
-            </div>
-
+        {/* COLUMNA DERECHA: Historial de Pedidos (Ocupa 7/12 en PC) */}
+        <div className="lg:col-span-7 bg-gray-800 p-6 sm:p-8 rounded-3xl border border-gray-700 shadow-xl flex flex-col h-full max-h-[750px]">
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-700 pb-4 gap-4">
+            <h2 className="text-xl font-black text-white flex items-center gap-2">
+              <span>🛍️</span> Historial de Compras
+            </h2>
+            <span className="bg-gray-900 text-[#FF9980] px-4 py-2 rounded-full text-sm font-bold border border-gray-700 shadow-inner inline-block text-center">
+              {orders.length} {orders.length === 1 ? 'pedido registrado' : 'pedidos registrados'}
+            </span>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-gray-700">
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full sm:w-auto px-10 bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black py-4 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none"
-            >
-              {saving ? 'Guardando...' : 'Guardar Mis Datos'}
-            </button>
+          <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar">
+            {loadingOrders ? (
+              <div className="flex justify-center py-20">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-[#FF9980]"></div>
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="text-center py-20 bg-gray-900/50 rounded-2xl border border-dashed border-gray-700">
+                <span className="text-6xl block mb-4 opacity-50">🛒</span>
+                <h3 className="text-xl font-bold text-gray-300 mb-2">Aún no tenés pedidos</h3>
+                <p className="text-gray-500 text-sm">Cuando realices tu primera compra, aparecerá aquí junto con su estado de envío.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {orders.map(order => (
+                  <div key={order.id} className="bg-gray-900 p-5 rounded-2xl border border-gray-700 hover:border-[#FF9980]/50 transition-colors">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                      <div>
+                        <p className="text-gray-400 text-xs font-mono mb-1">Orden #{order.id.split('-')[0].toUpperCase()}</p>
+                        <p className="text-gray-100 font-bold text-sm">{formatDate(order.created_at)}</p>
+                      </div>
+                      {getStatusBadge(order.status)}
+                    </div>
+                    
+                    <div className="border-t border-gray-800 pt-4 mt-4 flex justify-between items-end">
+                      <div className="text-gray-400 text-sm">
+                        <span className="font-bold text-gray-200 bg-gray-800 px-2 py-1 rounded-md">{order.items?.length || 0}</span> productos
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Total Abonado</p>
+                        <p className="text-xl font-black text-[#FF9980]">${Number(order.total).toLocaleString('es-AR')}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+        </div>
 
-          {error && (
-            <div className="bg-red-900/50 text-red-400 border border-red-800 p-4 rounded-xl font-bold text-sm">
-              {error}
-            </div>
-          )}
-          
-          {message && (
-            <div className="bg-green-900/50 text-green-400 border border-green-800 p-4 rounded-xl font-bold text-sm">
-              {message}
-            </div>
-          )}
-        </form>
       </div>
-
     </div>
   );
 }
