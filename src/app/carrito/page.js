@@ -17,7 +17,6 @@ export default function CartPage() {
   const total = cart ? cart.reduce((acc, item) => acc + (item.price * item.quantity), 0) : 0;
 
   const handleCheckout = async () => {
-    // 1. Si no está logueado, lo mandamos a que entre o se registre
     if (!user) {
       alert("Por favor, iniciá sesión o registrate para continuar con tu compra.");
       router.push('/login');
@@ -28,28 +27,25 @@ export default function CartPage() {
     setError(null);
 
     try {
-      // 2. Creamos el pedido en la base de datos
       const { data, error: dbError } = await supabase
         .from('pedidos')
         .insert([{
           user_id: user.id,
           total: total,
           items: cart,
-          status: 'pendiente' // El pedido nace como pendiente hasta que te pasen el comprobante
+          status: 'pendiente'
         }])
         .select()
         .single();
 
       if (dbError) throw dbError;
 
-      // 3. Vaciamos el carrito
       clearCart();
-
-      // 4. Lo mandamos a la pantalla de éxito con el ID de su pedido
       router.push(`/checkout/${data.id}`);
 
     } catch (err) {
-      setError("Hubo un error al procesar tu pedido. Intentá nuevamente.");
+      console.error("Error completo:", err);
+      setError(`Error del sistema: ${err.message || "Fallo de conexión"}`);
       setIsProcessing(false);
     }
   };
@@ -121,7 +117,7 @@ export default function CartPage() {
             </div>
 
             {error && (
-              <div className="bg-red-900/50 text-red-400 border border-red-800 p-3 rounded-xl text-center font-bold text-sm mb-4">
+              <div className="bg-red-900/50 text-red-400 border border-red-800 p-4 rounded-xl text-center font-bold text-sm mb-4">
                 {error}
               </div>
             )}
@@ -144,7 +140,7 @@ export default function CartPage() {
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#FF9980]"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                 Checkout Seguro
               </span>
-              <span className="text-xs font-normal">Pagarás mediante transferencia o Mercado Pago en el siguiente paso.</span>
+              <span className="text-xs font-normal">Pagarás mediante transferencia directa en el siguiente paso.</span>
             </div>
           </div>
         </div>
