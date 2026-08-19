@@ -10,32 +10,32 @@ export default function Navbar() {
   const totalItems = cart ? cart.reduce((total, item) => total + (item.quantity || 1), 0) : 0;
 
   // ATENCIÓN: Reemplazá este link por la dirección real de tu Instagram
-  const instagramUrl = "https://www.instagram.com/polirubroonline.cba?igsh=MTN5ZG9qZDc5dTBnOA%3D%3D&utm_source=qr";
+  const instagramUrl = "https://instagram.com/tu_usuario_aca";
 
   return (
     <nav className="sticky top-0 z-50 bg-gray-900 border-b border-[#FF9980]/30 shadow-lg backdrop-blur-sm bg-opacity-95">
       <div className="max-w-7xl mx-auto px-4 sm:px-8">
         <div className="flex justify-between items-center h-20">
           
-          {/* LOGO IZQUIERDA */}
+          {/* LOGO IZQUIERDA - Restaurado a sus colores fijos */}
           <Link href="/" className="flex items-center gap-2 group">
-            <span className="text-3xl font-black text-white tracking-tighter group-hover:text-[#FF9980] transition-colors">
-              Polirubro<span className="text-[#FF9980] group-hover:text-white transition-colors">Online</span>
+            <span className="text-3xl font-black text-white tracking-tighter">
+              Polirubro<span className="text-[#FF9980]">Online</span>
             </span>
           </Link>
 
           {/* MENÚ DERECHA (Instagram + Carrito) */}
           <div className="flex items-center gap-5 sm:gap-6">
             
-            {/* BOTÓN INSTAGRAM */}
+            {/* BOTÓN INSTAGRAM - Ahora con hover y brillo color salmón */}
             <a 
               href={instagramUrl} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-gray-400 hover:text-[#E1306C] transition-all transform hover:scale-110 flex items-center gap-2 group"
+              className="text-gray-400 hover:text-[#FF9980] transition-all transform hover:scale-110 flex items-center gap-2 group"
               title="Seguinos en Instagram"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:drop-shadow-[0_0_8px_rgba(225,48,108,0.5)]">
+              <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:drop-shadow-[0_0_8px_rgba(255,153,128,0.5)]">
                 <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
                 <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
                 <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
@@ -46,7 +46,7 @@ export default function Navbar() {
             {/* SEPARADOR VISUAL */}
             <div className="h-8 w-px bg-gray-700 hidden sm:block"></div>
 
-            {/* BOTÓN CARRITO */}
+            {/* BOTÓN CARRITO - Mantiene el salmón */}
             <Link href="/carrito" className="relative text-gray-300 hover:text-[#FF9980] transition-all transform hover:scale-110 flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="9" cy="21" r="1"></circle>
