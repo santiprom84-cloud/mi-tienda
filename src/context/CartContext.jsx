@@ -1,47 +1,59 @@
-"use client";
+'use client';
 
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 const CartContext = createContext();
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
-  
-  // Nuevo estado para controlar si el panel lateral está abierto o cerrado
-  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  const addToCart = (product) => {
-    setCart((prevCart) => {
-      const existingItem = prevCart.find((item) => item.id === product.id);
-      if (existingItem) {
-        return prevCart.map((item) =>
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-        );
+  // Cargar carrito desde el almacenamiento local al entrar
+  useEffect(() => {
+    const savedCart = localStorage.getItem('cart');
+    if (savedCart) {
+      try {
+        setCart(JSON.parse(savedCart));
+      } catch (e) {
+        console.error("Error leyendo el carrito");
       }
-      return [...prevCart, { ...product, quantity: 1 }];
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Guardar carrito en el almacenamiento local cada vez que cambia
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem('cart', JSON.stringify(cart));
+    }
+  }, [cart, isLoaded]);
+
+  const addToCart = (product, quantity = 1) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === product.id);
+      if (existing) {
+        return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + quantity } : item);
+      }
+      return [...prev, { ...product, quantity }];
     });
-    // Opcional: abrir el carrito automáticamente al agregar un producto
-    // setIsCartOpen(true); 
   };
 
-  const removeFromCart = (productId) => {
-    setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
+  const removeFromCart = (id) => {
+    setCart(prev => prev.filter(item => item.id !== id));
   };
 
-  const clearCart = () => setCart([]);
+  const updateQuantity = (id, quantity) => {
+    if (quantity < 1) return;
+    setCart(prev => prev.map(item => item.id === id ? { ...item, quantity } : item));
+  };
 
-  const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
+  // NUEVA FUNCIÓN: Vaciar el carrito al finalizar la compra
+  const clearCart = () => {
+    setCart([]);
+  };
 
   return (
-    <CartContext.Provider value={{ 
-      cart, 
-      addToCart, 
-      removeFromCart, 
-      clearCart, 
-      cartCount,
-      isCartOpen,      // Exportamos el estado
-      setIsCartOpen    // Exportamos la función para cambiar el estado
-    }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart }}>
       {children}
     </CartContext.Provider>
   );
