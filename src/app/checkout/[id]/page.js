@@ -4,25 +4,33 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
+import { useParams } from 'next/navigation'; // <-- NUEVA HERRAMIENTA IMPORTADA
 
-export default function CheckoutSuccessPage({ params }) {
-  const { id } = params; // Este es el ID del pedido
+export default function CheckoutSuccessPage() {
+  // 1. Extraemos el ID de forma segura con el hook de Next.js
+  const params = useParams();
+  const id = params?.id; 
+
   const { user, loadingAuth } = useAuth();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // === ⚠️ DATOS IMPORTANTES A MODIFICAR ⚠️ ===
-  const MI_ALIAS = "santimarquez."; // Poné acá tu alias de Mercado Pago o banco
-  const MI_TITULAR = "Santiago Alejo Márquez"; // Tu nombre
-  const MI_WHATSAPP = "5493518089416"; // Tu número de WhatsApp (Código de país + área sin 0 + número sin 15)
+  const MI_ALIAS = "tu.alias.mp"; // Poné acá tu alias de Mercado Pago, banco o Takenos
+  const MI_TITULAR = "Santiago Alejo Márquez"; 
+  const MI_WHATSAPP = "5493510000000"; // Tu número (Código de país + área sin 0 + número sin 15)
   // ==========================================
 
   useEffect(() => {
+    // Si tenemos el usuario y el ID válido de la URL, buscamos el recibo
     if (user && id) {
       fetchOrder();
+    } else if (!loadingAuth && !user) {
+      // Si por algún motivo se desconectó, cancelamos la carga para que no quede tildado
+      setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, id]);
+  }, [user, id, loadingAuth]);
 
   const fetchOrder = async () => {
     try {
@@ -37,6 +45,7 @@ export default function CheckoutSuccessPage({ params }) {
     } catch (error) {
       console.error("Error al buscar el pedido:", error);
     } finally {
+      // Pase lo que pase, apagamos la animación de carga
       setLoading(false);
     }
   };
@@ -60,12 +69,12 @@ export default function CheckoutSuccessPage({ params }) {
       <div className="min-h-[70vh] flex flex-col items-center justify-center text-center p-4">
         <span className="text-6xl mb-4">⚠️</span>
         <h1 className="text-2xl font-bold text-gray-100">No encontramos este pedido.</h1>
-        <Link href="/" className="mt-6 text-[#FF9980] underline font-bold">Volver a la tienda</Link>
+        <p className="text-gray-400 mt-2">Puede que el ID no sea correcto o la compra no se haya procesado.</p>
+        <Link href="/perfil" className="mt-6 text-[#FF9980] underline font-bold">Ver Mis Pedidos</Link>
       </div>
     );
   }
 
-  // Armamos el mensaje predeterminado para WhatsApp
   const orderNumber = order.id.split('-')[0].toUpperCase();
   const mensajeWa = `¡Hola! Acabo de hacer el pedido #${orderNumber} por $${order.total}. Te adjunto el comprobante de transferencia.`;
   const linkWhatsapp = `https://wa.me/${MI_WHATSAPP}?text=${encodeURIComponent(mensajeWa)}`;
@@ -88,7 +97,7 @@ export default function CheckoutSuccessPage({ params }) {
           <div className="text-left space-y-4 max-w-sm mx-auto">
             <div className="flex justify-between border-b border-gray-700 pb-2">
               <span className="text-gray-400 font-bold">Total a pagar:</span>
-              <span className="text-white font-black text-xl">${order.total.toLocaleString('es-AR')}</span>
+              <span className="text-white font-black text-xl">${Number(order.total).toLocaleString('es-AR')}</span>
             </div>
             <div className="flex justify-between border-b border-gray-700 pb-2 items-center">
               <span className="text-gray-400 font-bold">Alias:</span>
