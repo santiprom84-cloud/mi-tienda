@@ -1,41 +1,48 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation'; // <-- Importamos el detector de rutas
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Navbar() {
   const { cart } = useCart();
   const { user } = useAuth();
+  const pathname = usePathname(); // <-- Guardamos la ruta actual
 
   const totalItems = cart ? cart.reduce((total, item) => total + (item.quantity || 1), 0) : 0;
   const instagramUrl = "https://instagram.com/tu_usuario_aca";
 
-  // Identificador de Admin
   const isAdmin = user?.email === 'santiprom84@gmail.com';
+  
+  // Condición: ¿Estamos en la página principal?
+  const isHome = pathname === '/'; 
 
   return (
     <nav className="sticky top-0 z-50 bg-[#FF9980] shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-8">
         <div className="flex justify-between items-center h-20">
           
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-3xl">🏪</span>
-            <span className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tighter">
+          {/* LOGO PRINCIPAL */}
+          <Link href="/" className="flex items-center gap-2 shrink-0">
+            <span className="text-2xl sm:text-3xl">🏪</span>
+            <span className="text-xl sm:text-3xl font-black text-gray-900 tracking-tighter">
               Polirubro<span className="text-white">Online</span>
             </span>
           </Link>
 
-          <div className="flex items-center gap-4 sm:gap-6">
+          {/* CONTROLES DERECHA */}
+          <div className="flex items-center gap-2 sm:gap-4">
             
+            {/* INSTAGRAM (Oculto en celulares chicos para no amontonar) */}
             <a 
               href={instagramUrl} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-gray-900 hover:text-[#E1306C] transition-all transform hover:scale-105 flex items-center gap-2 group hidden sm:flex"
+              className="text-gray-900 hover:text-[#E1306C] transition-all transform hover:scale-105 flex items-center gap-2 group hidden lg:flex"
               title="Seguinos en Instagram"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:drop-shadow-[0_0_8px_rgba(225,48,108,0.5)]">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:drop-shadow-[0_0_8px_rgba(225,48,108,0.5)]">
                 <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
                 <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
                 <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
@@ -45,25 +52,41 @@ export default function Navbar() {
               </span>
             </a>
 
-            <div className="h-8 w-px bg-gray-900/20 hidden sm:block"></div>
+            <div className="h-8 w-px bg-gray-900/20 hidden lg:block mx-1"></div>
 
-            {/* BOTÓN SECRETO ADMIN (Solo visible para vos) */}
-            {isAdmin && (
+            {/* 🔥 NUEVO BOTÓN: VOLVER AL INICIO (Solo visible si no estás en '/') */}
+            {!isHome && (
               <Link 
-                href="/admin" 
-                className="bg-red-600 text-white p-2.5 sm:p-3 rounded-full hover:bg-red-700 transition-transform transform hover:scale-105 flex items-center justify-center shadow-sm relative group"
-                title="Panel de Control (Admin)"
+                href="/" 
+                className="bg-gray-900/10 text-gray-900 hover:bg-gray-900 hover:text-white p-2.5 sm:px-4 sm:py-2.5 rounded-full sm:rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm border border-transparent hover:border-gray-700"
+                title="Volver al Inicio"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                  <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+                <span className="hidden sm:block font-bold text-sm">Inicio</span>
               </Link>
             )}
 
+            {/* BOTÓN SECRETO ADMIN */}
+            {isAdmin && (
+              <Link 
+                href="/admin" 
+                className="bg-red-600 text-white p-2.5 rounded-full hover:bg-red-700 transition-transform transform hover:scale-105 flex items-center justify-center shadow-sm"
+                title="Panel Admin"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              </Link>
+            )}
+
+            {/* USUARIO */}
             <Link 
               href={user ? "/perfil" : "/login"} 
-              className="bg-gray-900 text-white p-2.5 sm:p-3 rounded-full hover:bg-gray-800 transition-transform transform hover:scale-105 flex items-center justify-center shadow-sm relative group"
+              className="bg-gray-900 text-white p-2.5 rounded-full hover:bg-gray-800 transition-transform transform hover:scale-105 flex items-center justify-center shadow-sm relative"
               title={user ? "Mi Perfil" : "Iniciar Sesión"}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
@@ -72,8 +95,9 @@ export default function Navbar() {
               )}
             </Link>
 
-            <Link href="/carrito" className="relative bg-gray-900 text-white p-2.5 sm:p-3 rounded-full hover:bg-gray-800 transition-transform transform hover:scale-105 flex items-center justify-center shadow-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {/* CARRITO */}
+            <Link href="/carrito" className="relative bg-gray-900 text-white p-2.5 rounded-full hover:bg-gray-800 transition-transform transform hover:scale-105 flex items-center justify-center shadow-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="9" cy="21" r="1"></circle>
                 <circle cx="20" cy="21" r="1"></circle>
                 <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
