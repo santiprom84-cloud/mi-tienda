@@ -47,8 +47,8 @@ export default function Home() {
 
   const categories = ['Todas', ...new Set(products.map(p => p.category).filter(Boolean))];
 
-  // 1. Primero filtramos
-  let filteredAndSorted = products.filter(product => {
+  // 1. Primero filtramos (Corregido el nombre de la variable)
+  let filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'Todas' || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
@@ -56,12 +56,12 @@ export default function Home() {
 
   // 2. Luego ordenamos el resultado
   if (sortOrder === 'mayor_precio') {
-    filteredAndSorted.sort((a, b) => Number(b.price) - Number(a.price));
+    filteredProducts.sort((a, b) => Number(b.price) - Number(a.price));
   } else if (sortOrder === 'menor_precio') {
-    filteredAndSorted.sort((a, b) => Number(a.price) - Number(b.price));
+    filteredProducts.sort((a, b) => Number(a.price) - Number(b.price));
   } else {
     // Por defecto: Más recientes (usando la fecha de creación)
-    filteredAndSorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    filteredProducts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
   return (
@@ -255,7 +255,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* ANIMACIÓN TAILWIND (Agregada en línea para el menú lateral) */}
+      {/* ANIMACIÓN TAILWIND */}
       <style jsx global>{`
         @keyframes slide-right {
           from { transform: translateX(-100%); }
