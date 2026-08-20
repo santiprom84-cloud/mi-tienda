@@ -2,14 +2,17 @@
 
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
-import { useAuth } from '@/context/AuthContext'; // <-- Traemos el usuario
+import { useAuth } from '@/context/AuthContext';
 
 export default function Navbar() {
   const { cart } = useCart();
-  const { user } = useAuth(); // Saber si está logueado o no
+  const { user } = useAuth();
 
   const totalItems = cart ? cart.reduce((total, item) => total + (item.quantity || 1), 0) : 0;
   const instagramUrl = "https://instagram.com/tu_usuario_aca";
+
+  // Identificador de Admin
+  const isAdmin = user?.email === 'santiprom84@gmail.com';
 
   return (
     <nav className="sticky top-0 z-50 bg-[#FF9980] shadow-md">
@@ -44,7 +47,17 @@ export default function Navbar() {
 
             <div className="h-8 w-px bg-gray-900/20 hidden sm:block"></div>
 
-            {/* BOTÓN USUARIO / LOGIN */}
+            {/* BOTÓN SECRETO ADMIN (Solo visible para vos) */}
+            {isAdmin && (
+              <Link 
+                href="/admin" 
+                className="bg-red-600 text-white p-2.5 sm:p-3 rounded-full hover:bg-red-700 transition-transform transform hover:scale-105 flex items-center justify-center shadow-sm relative group"
+                title="Panel de Control (Admin)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              </Link>
+            )}
+
             <Link 
               href={user ? "/perfil" : "/login"} 
               className="bg-gray-900 text-white p-2.5 sm:p-3 rounded-full hover:bg-gray-800 transition-transform transform hover:scale-105 flex items-center justify-center shadow-sm relative group"
@@ -54,13 +67,11 @@ export default function Navbar() {
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
-              {/* Puntito verde si está conectado */}
               {user && (
                 <span className="absolute 0 top-0 right-0 w-3 h-3 bg-green-500 border-2 border-gray-900 rounded-full"></span>
               )}
             </Link>
 
-            {/* BOTÓN CARRITO */}
             <Link href="/carrito" className="relative bg-gray-900 text-white p-2.5 sm:p-3 rounded-full hover:bg-gray-800 transition-transform transform hover:scale-105 flex items-center justify-center shadow-sm">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="9" cy="21" r="1"></circle>
