@@ -17,6 +17,9 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pedidos'); 
 
+  // NUEVO: Estado para el buscador de productos del Admin
+  const [adminProductSearch, setAdminProductSearch] = useState('');
+
   // Estados del Formulario de Productos
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -25,7 +28,7 @@ export default function AdminDashboard() {
   });
   const [savingProduct, setSavingProduct] = useState(false);
 
-  // NUEVO: Estados para Drag & Drop de imágenes
+  // Estados para Drag & Drop de imágenes
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -146,28 +149,20 @@ export default function AdminDashboard() {
     }
   };
 
-  // ==========================================
-  // FUNCIONES DE ARRASTRAR Y SOLTAR (UPLOAD)
-  // ==========================================
   const handleImageUpload = async (file) => {
     if (!file) return;
     setUploadingImage(true);
     try {
-      // 1. Generamos un nombre único para la imagen
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
       
-      // 2. Subimos la imagen al storage
       const { error: uploadError } = await supabase.storage
         .from('productos')
         .upload(fileName, file);
 
       if (uploadError) throw uploadError;
 
-      // 3. Obtenemos la URL pública final
       const { data } = supabase.storage.from('productos').getPublicUrl(fileName);
-      
-      // 4. Guardamos la URL en el formulario
       setProductForm(prev => ({ ...prev, image: data.publicUrl }));
     } catch (error) {
       alert(`Error al subir imagen: ${error.message}`);
@@ -196,6 +191,12 @@ export default function AdminDashboard() {
       year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
   };
+
+  // Filtrar productos del admin según el buscador
+  const filteredAdminProducts = adminProducts.filter(p => 
+    p.name.toLowerCase().includes(adminProductSearch.toLowerCase()) || 
+    (p.category && p.category.toLowerCase().includes(adminProductSearch.toLowerCase()))
+  );
 
   if (loadingAuth || loading) {
     return (
@@ -247,16 +248,34 @@ export default function AdminDashboard() {
 
       {activeTab === 'productos' && (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex justify-between items-center bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-lg">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-lg gap-4">
             <div>
               <h2 className="text-xl font-black text-white">Inventario</h2>
               <p className="text-gray-400 text-sm">Gestioná los {adminProducts.length} productos de tu tienda.</p>
             </div>
-            <button onClick={() => openProductModal()} className="bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-6 py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              Nuevo Producto
-            </button>
+            
+            {/* NUEVA BARRA DE BÚSQUEDA Y BOTÓN JUNTOS */}
+            <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-4">
+              <div className="relative w-full sm:w-64">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Buscar en inventario..."
+                  value={adminProductSearch}
+                  onChange={(e) => setAdminProductSearch(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-600 rounded-xl pl-10 pr-4 py-2.5 sm:py-3 text-sm text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors shadow-inner"
+                />
+              </div>
+
+              <button onClick={() => openProductModal()} className="w-full sm:w-auto bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-6 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                Nuevo Producto
+              </button>
+            </div>
           </div>
+
           <div className="bg-gray-800 rounded-2xl border border-gray-700 shadow-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-gray-300">
@@ -270,10 +289,10 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {adminProducts.length === 0 ? (
-                    <tr><td colSpan="5" className="text-center py-10 text-gray-500">No hay productos en el catálogo.</td></tr>
+                  {filteredAdminProducts.length === 0 ? (
+                    <tr><td colSpan="5" className="text-center py-10 text-gray-500">No se encontraron productos con esa búsqueda.</td></tr>
                   ) : (
-                    adminProducts.map((p) => (
+                    filteredAdminProducts.map((p) => (
                       <tr key={p.id} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
                         <td className="px-6 py-3">
                           <img src={p.image || 'https://via.placeholder.com/50'} alt={p.name} className="w-12 h-12 rounded-lg object-cover border border-gray-600" />
@@ -318,7 +337,6 @@ export default function AdminDashboard() {
             <div className="p-6 overflow-y-auto custom-scrollbar flex-grow">
               <form id="productForm" onSubmit={saveProduct} className="flex flex-col gap-5">
                 
-                {/* ZONA DE ARRASTRAR Y SOLTAR IMAGEN */}
                 <div>
                   <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Foto del Producto *</label>
                   <div 
