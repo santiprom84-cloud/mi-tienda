@@ -9,22 +9,25 @@ export default function AdminDashboard() {
   const { user, loadingAuth } = useAuth();
   const router = useRouter();
   
-  // Estados de datos
   const [orders, setOrders] = useState([]);
   const [registeredUsers, setRegisteredUsers] = useState([]);
   const [activeUsers, setActiveUsers] = useState([]);
-  const [adminProducts, setAdminProducts] = useState([]); // NUEVO: Estado para productos
+  const [adminProducts, setAdminProducts] = useState([]);
   
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('pedidos'); // 'pedidos', 'usuarios', 'radar', 'productos'
+  const [activeTab, setActiveTab] = useState('pedidos'); 
 
-  // NUEVO: Estados para el Formulario de Productos
+  // Estados del Formulario de Productos
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [productForm, setProductForm] = useState({
     name: '', price: '', category: '', image: '', description: ''
   });
   const [savingProduct, setSavingProduct] = useState(false);
+
+  // NUEVO: Estados para Drag & Drop de imágenes
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const ADMIN_EMAIL = 'santiprom84@gmail.com';
 
@@ -43,21 +46,14 @@ export default function AdminDashboard() {
   const fetchAdminData = async () => {
     setLoading(true);
     try {
-      // 1. Pedidos
       const { data: pedidosData } = await supabase.rpc('get_admin_pedidos');
       setOrders(pedidosData || []);
 
-      // 2. Usuarios
       const { data: usuariosData } = await supabase.rpc('get_admin_users');
       setRegisteredUsers(usuariosData || []);
 
-      // 3. NUEVO: Productos
-      const { data: productosData } = await supabase
-        .from('productos')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data: productosData } = await supabase.from('productos').select('*').order('created_at', { ascending: false });
       setAdminProducts(productosData || []);
-      
     } catch (error) {
       console.error("Error cargando panel:", error);
     } finally {
@@ -78,7 +74,6 @@ export default function AdminDashboard() {
     return () => supabase.removeChannel(channel);
   };
 
-  // --- FUNCIONES DE PEDIDOS ---
   const updateOrderStatus = async (id, newStatus) => {
     try {
       await supabase.from('pedidos').update({ status: newStatus }).eq('id', id);
@@ -98,16 +93,11 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- NUEVAS FUNCIONES DE PRODUCTOS ---
   const openProductModal = (product = null) => {
     if (product) {
       setEditingProduct(product);
       setProductForm({
-        name: product.name || '',
-        price: product.price || '',
-        category: product.category || '',
-        image: product.image || '',
-        description: product.description || ''
+        name: product.name || '', price: product.price || '', category: product.category || '', image: product.image || '', description: product.description || ''
       });
     } else {
       setEditingProduct(null);
@@ -129,12 +119,10 @@ export default function AdminDashboard() {
       };
 
       if (editingProduct) {
-        // Actualizar
         const { data, error } = await supabase.from('productos').update(productData).eq('id', editingProduct.id).select().single();
         if (error) throw error;
         setAdminProducts(adminProducts.map(p => p.id === editingProduct.id ? data : p));
       } else {
-        // Crear nuevo
         const { data, error } = await supabase.from('productos').insert([productData]).select().single();
         if (error) throw error;
         setAdminProducts([data, ...adminProducts]);
@@ -158,6 +146,51 @@ export default function AdminDashboard() {
     }
   };
 
+  // ==========================================
+  // FUNCIONES DE ARRASTRAR Y SOLTAR (UPLOAD)
+  // ==========================================
+  const handleImageUpload = async (file) => {
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      // 1. Generamos un nombre único para la imagen
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      
+      // 2. Subimos la imagen al storage
+      const { error: uploadError } = await supabase.storage
+        .from('productos')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // 3. Obtenemos la URL pública final
+      const { data } = supabase.storage.from('productos').getPublicUrl(fileName);
+      
+      // 4. Guardamos la URL en el formulario
+      setProductForm(prev => ({ ...prev, image: data.publicUrl }));
+    } catch (error) {
+      alert(`Error al subir imagen: ${error.message}`);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const onDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
+  const onDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
+  const onDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleImageUpload(e.dataTransfer.files[0]);
+    }
+  };
+  const onFileInput = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleImageUpload(e.target.files[0]);
+    }
+  };
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString('es-AR', {
       year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -176,7 +209,6 @@ export default function AdminDashboard() {
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-8 mt-4 mb-20 relative">
       
-      {/* CABECERA Y ESTADÍSTICAS */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6 border-b border-gray-700 pb-8">
         <div>
           <h1 className="text-3xl sm:text-4xl font-black text-gray-100 flex items-center gap-3 mb-2">
@@ -206,44 +238,25 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* MENÚ DE NAVEGACIÓN (PESTAÑAS) */}
       <div className="flex overflow-x-auto gap-2 mb-8 bg-gray-900 p-2 rounded-xl border border-gray-700 custom-scrollbar">
-        <button onClick={() => setActiveTab('pedidos')} className={`flex-1 py-3 px-6 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'pedidos' ? 'bg-[#FF9980] text-gray-900 shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>
-          🛍️ Pedidos
-        </button>
-        <button onClick={() => setActiveTab('productos')} className={`flex-1 py-3 px-6 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'productos' ? 'bg-[#FF9980] text-gray-900 shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>
-          📦 Productos
-        </button>
-        <button onClick={() => setActiveTab('usuarios')} className={`flex-1 py-3 px-6 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'usuarios' ? 'bg-[#FF9980] text-gray-900 shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>
-          👥 Usuarios
-        </button>
-        <button onClick={() => setActiveTab('radar')} className={`flex-1 py-3 px-6 rounded-lg font-bold text-sm transition-all whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'radar' ? 'bg-[#FF9980] text-gray-900 shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>
-          📡 En Vivo <span className="bg-green-500 w-2 h-2 rounded-full"></span>
-        </button>
+        <button onClick={() => setActiveTab('pedidos')} className={`flex-1 py-3 px-6 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'pedidos' ? 'bg-[#FF9980] text-gray-900 shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>🛍️ Pedidos</button>
+        <button onClick={() => setActiveTab('productos')} className={`flex-1 py-3 px-6 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'productos' ? 'bg-[#FF9980] text-gray-900 shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>📦 Productos</button>
+        <button onClick={() => setActiveTab('usuarios')} className={`flex-1 py-3 px-6 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${activeTab === 'usuarios' ? 'bg-[#FF9980] text-gray-900 shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>👥 Usuarios</button>
+        <button onClick={() => setActiveTab('radar')} className={`flex-1 py-3 px-6 rounded-lg font-bold text-sm transition-all whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'radar' ? 'bg-[#FF9980] text-gray-900 shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>📡 En Vivo <span className="bg-green-500 w-2 h-2 rounded-full"></span></button>
       </div>
 
-      {/* ========================================== */}
-      {/* PESTAÑA: PRODUCTOS (NUEVA) */}
-      {/* ========================================== */}
       {activeTab === 'productos' && (
         <div className="space-y-6 animate-fade-in">
-          
-          {/* Barra superior de productos */}
           <div className="flex justify-between items-center bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-lg">
             <div>
               <h2 className="text-xl font-black text-white">Inventario</h2>
               <p className="text-gray-400 text-sm">Gestioná los {adminProducts.length} productos de tu tienda.</p>
             </div>
-            <button 
-              onClick={() => openProductModal()}
-              className="bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-6 py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center gap-2"
-            >
+            <button onClick={() => openProductModal()} className="bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-6 py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               Nuevo Producto
             </button>
           </div>
-
-          {/* Tabla de Productos */}
           <div className="bg-gray-800 rounded-2xl border border-gray-700 shadow-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-gray-300">
@@ -271,12 +284,8 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-6 py-3 font-black text-[#FF9980]">${Number(p.price).toLocaleString('es-AR')}</td>
                         <td className="px-6 py-3 text-right space-x-2">
-                          <button onClick={() => openProductModal(p)} className="bg-blue-900/50 text-blue-400 hover:bg-blue-900 border border-blue-800/50 px-3 py-1.5 rounded-lg font-bold text-xs transition-colors">
-                            Editar
-                          </button>
-                          <button onClick={() => deleteProduct(p.id)} className="bg-red-900/50 text-red-400 hover:bg-red-900 border border-red-800/50 px-3 py-1.5 rounded-lg font-bold text-xs transition-colors">
-                            Borrar
-                          </button>
+                          <button onClick={() => openProductModal(p)} className="bg-blue-900/50 text-blue-400 hover:bg-blue-900 border border-blue-800/50 px-3 py-1.5 rounded-lg font-bold text-xs transition-colors">Editar</button>
+                          <button onClick={() => deleteProduct(p.id)} className="bg-red-900/50 text-red-400 hover:bg-red-900 border border-red-800/50 px-3 py-1.5 rounded-lg font-bold text-xs transition-colors">Borrar</button>
                         </td>
                       </tr>
                     ))
@@ -289,7 +298,7 @@ export default function AdminDashboard() {
       )}
 
       {/* ========================================== */}
-      {/* MODAL: CREAR / EDITAR PRODUCTO */}
+      {/* MODAL: CREAR / EDITAR PRODUCTO CON DRAG & DROP */}
       {/* ========================================== */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -309,6 +318,50 @@ export default function AdminDashboard() {
             <div className="p-6 overflow-y-auto custom-scrollbar flex-grow">
               <form id="productForm" onSubmit={saveProduct} className="flex flex-col gap-5">
                 
+                {/* ZONA DE ARRASTRAR Y SOLTAR IMAGEN */}
+                <div>
+                  <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Foto del Producto *</label>
+                  <div 
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                    className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center transition-all relative overflow-hidden group ${
+                      isDragging ? 'border-[#FF9980] bg-[#FF9980]/10 scale-[1.02]' : 'border-gray-600 bg-gray-900 hover:border-gray-500 hover:bg-gray-800'
+                    }`}
+                  >
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={onFileInput} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                      title="Arrastrá o hacé clic"
+                    />
+                    
+                    {uploadingImage ? (
+                      <div className="flex flex-col items-center gap-3 py-4">
+                        <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-[#FF9980]"></div>
+                        <p className="text-sm text-[#FF9980] font-bold animate-pulse">Subiendo imagen al servidor...</p>
+                      </div>
+                    ) : productForm.image ? (
+                      <div className="flex flex-col items-center gap-3 relative z-0">
+                        <div className="relative">
+                          <img src={productForm.image} alt="Preview" className="h-32 w-32 rounded-lg object-cover border-2 border-[#FF9980] shadow-lg" />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                            <span className="text-white font-bold text-xs">Cambiar foto</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-400 font-bold">Arrastrá otra foto si querés cambiarla</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center text-center gap-2 py-4">
+                        <span className="text-4xl transition-transform group-hover:scale-110 mb-2">📸</span>
+                        <p className="text-gray-200 font-black text-sm">Arrastrá tu foto acá o hacé clic</p>
+                        <p className="text-gray-500 text-xs font-bold">JPG, PNG o WEBP</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Nombre del Producto *</label>
                   <input type="text" required value={productForm.name} onChange={(e) => setProductForm({...productForm, name: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors" placeholder="Ej: Termo Stanley 1L" />
@@ -326,16 +379,6 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">URL de la Imagen</label>
-                  <input type="url" value={productForm.image} onChange={(e) => setProductForm({...productForm, image: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors" placeholder="https://ejemplo.com/imagen.jpg" />
-                  {productForm.image && (
-                    <div className="mt-3 bg-gray-900 p-2 rounded-xl inline-block border border-gray-700">
-                      <img src={productForm.image} alt="Vista previa" className="h-20 rounded-lg object-cover" onError={(e) => e.target.style.display = 'none'} />
-                    </div>
-                  )}
-                </div>
-
-                <div>
                   <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Descripción Detallada</label>
                   <textarea rows="4" value={productForm.description} onChange={(e) => setProductForm({...productForm, description: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors resize-none" placeholder="Escribí las características principales..."></textarea>
                 </div>
@@ -347,7 +390,7 @@ export default function AdminDashboard() {
               <button type="button" onClick={() => setIsProductModalOpen(false)} className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
                 Cancelar
               </button>
-              <button type="submit" form="productForm" disabled={savingProduct} className="bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-8 py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none flex items-center gap-2">
+              <button type="submit" form="productForm" disabled={savingProduct || uploadingImage} className="bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-8 py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none flex items-center gap-2">
                 {savingProduct ? 'Guardando...' : 'Guardar Producto'}
               </button>
             </div>
@@ -356,10 +399,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ========================================== */}
-      {/* RESTO DE PESTAÑAS (Las que ya funcionaban) */}
-      {/* ========================================== */}
-      
       {/* CONTENIDO PESTAÑA: PEDIDOS */}
       {activeTab === 'pedidos' && (
         <div className="space-y-6 animate-fade-in">
@@ -369,7 +408,6 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {orders.map(order => (
                 <div key={order.id} className="bg-gray-800 rounded-2xl border border-gray-700 shadow-xl overflow-hidden flex flex-col">
-                  {/* ... (Encabezado y Datos del pedido idénticos) ... */}
                   <div className="bg-gray-900 p-5 border-b border-gray-700 flex justify-between items-start">
                     <div>
                       <p className="text-[#FF9980] text-sm font-black mb-1">ORDEN: #{order.id.split('-')[0].toUpperCase()}</p>
@@ -486,7 +524,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Animaciones simples */}
       <style jsx global>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
