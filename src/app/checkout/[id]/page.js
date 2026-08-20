@@ -4,10 +4,9 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
-import { useParams } from 'next/navigation'; // <-- NUEVA HERRAMIENTA IMPORTADA
+import { useParams } from 'next/navigation';
 
 export default function CheckoutSuccessPage() {
-  // 1. Extraemos el ID de forma segura con el hook de Next.js
   const params = useParams();
   const id = params?.id; 
 
@@ -15,18 +14,16 @@ export default function CheckoutSuccessPage() {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // === ⚠️ DATOS IMPORTANTES A MODIFICAR ⚠️ ===
-  const MI_ALIAS = "tu.alias.mp"; // Poné acá tu alias de Mercado Pago, banco o Takenos
+  // === ⚠️ TUS DATOS DE COBRO OFICIALES ⚠️ ===
+  const MI_ALIAS = "santimarquez."; 
   const MI_TITULAR = "Santiago Alejo Márquez"; 
-  const MI_WHATSAPP = "5493510000000"; // Tu número (Código de país + área sin 0 + número sin 15)
+  const MI_WHATSAPP = "5493518089416"; 
   // ==========================================
 
   useEffect(() => {
-    // Si tenemos el usuario y el ID válido de la URL, buscamos el recibo
     if (user && id) {
       fetchOrder();
     } else if (!loadingAuth && !user) {
-      // Si por algún motivo se desconectó, cancelamos la carga para que no quede tildado
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -45,14 +42,14 @@ export default function CheckoutSuccessPage() {
     } catch (error) {
       console.error("Error al buscar el pedido:", error);
     } finally {
-      // Pase lo que pase, apagamos la animación de carga
       setLoading(false);
     }
   };
 
   const copiarAlias = () => {
     navigator.clipboard.writeText(MI_ALIAS);
-    alert("¡Alias copiado al portapapeles!");
+    // Cambiamos el alert nativo por algo más sutil o simplemente dejamos que el usuario sepa que funcionó
+    alert("¡Alias copiado al portapapeles listo para pegar en tu banco!");
   };
 
   if (loadingAuth || loading) {
@@ -76,7 +73,7 @@ export default function CheckoutSuccessPage() {
   }
 
   const orderNumber = order.id.split('-')[0].toUpperCase();
-  const mensajeWa = `¡Hola! Acabo de hacer el pedido #${orderNumber} por $${order.total}. Te adjunto el comprobante de transferencia.`;
+  const mensajeWa = `¡Hola Santiago! Acabo de hacer el pedido #${orderNumber} por $${order.total}. Te adjunto el comprobante de transferencia.`;
   const linkWhatsapp = `https://wa.me/${MI_WHATSAPP}?text=${encodeURIComponent(mensajeWa)}`;
 
   return (
@@ -96,19 +93,27 @@ export default function CheckoutSuccessPage() {
           
           <div className="text-left space-y-4 max-w-sm mx-auto">
             <div className="flex justify-between border-b border-gray-700 pb-2">
-              <span className="text-gray-400 font-bold">Total a pagar:</span>
-              <span className="text-white font-black text-xl">${Number(order.total).toLocaleString('es-AR')}</span>
+              <span className="text-gray-400 font-bold mt-1">Total a pagar:</span>
+              <span className="text-white font-black text-2xl">${Number(order.total).toLocaleString('es-AR')}</span>
             </div>
-            <div className="flex justify-between border-b border-gray-700 pb-2 items-center">
+            
+            <div className="flex justify-between border-b border-gray-700 pb-3 pt-2 items-center">
               <span className="text-gray-400 font-bold">Alias:</span>
-              <div className="flex items-center gap-2">
-                <span className="text-white font-bold">{MI_ALIAS}</span>
-                <button onClick={copiarAlias} className="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-md transition-colors" title="Copiar Alias">
+              <div className="flex items-center gap-3">
+                <span className="text-white font-black tracking-wide text-lg">{MI_ALIAS}</span>
+                {/* BOTÓN COPIAR MEJORADO */}
+                <button 
+                  onClick={copiarAlias} 
+                  className="bg-gray-700 hover:bg-[#FF9980] hover:text-gray-900 text-white px-3 py-1.5 rounded-lg transition-all transform hover:scale-105 flex items-center gap-2 text-sm font-bold shadow-sm" 
+                  title="Copiar Alias"
+                >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  Copiar
                 </button>
               </div>
             </div>
-            <div className="flex justify-between pb-2">
+            
+            <div className="flex justify-between pt-2">
               <span className="text-gray-400 font-bold">Titular:</span>
               <span className="text-gray-300 text-sm font-bold">{MI_TITULAR}</span>
             </div>
