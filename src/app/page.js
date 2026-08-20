@@ -11,9 +11,13 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [addedToast, setAddedToast] = useState(null);
   
-  // Estados para el Buscador y Categorías que habíamos perdido
+  // Estados para Búsqueda, Categorías y Orden
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todas');
+  const [sortOrder, setSortOrder] = useState('recientes'); // 'recientes', 'mayor_precio', 'menor_precio'
+  
+  // Estado para abrir/cerrar el menú lateral de categorías (Hamburguesa)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -24,8 +28,7 @@ export default function Home() {
     try {
       const { data, error } = await supabase
         .from('productos')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
       
       if (error) throw error;
       setProducts(data || []);
@@ -42,30 +45,80 @@ export default function Home() {
     setTimeout(() => setAddedToast(null), 3000);
   };
 
-  // Recuperamos la lógica de categorías dinámicas
   const categories = ['Todas', ...new Set(products.map(p => p.category).filter(Boolean))];
 
-  // Filtramos los productos según búsqueda y categoría
-  const filteredProducts = products.filter(product => {
+  // 1. Primero filtramos
+  let filteredAndSorted = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'Todas' || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
+  // 2. Luego ordenamos el resultado
+  if (sortOrder === 'mayor_precio') {
+    filteredAndSorted.sort((a, b) => Number(b.price) - Number(a.price));
+  } else if (sortOrder === 'menor_precio') {
+    filteredAndSorted.sort((a, b) => Number(a.price) - Number(b.price));
+  } else {
+    // Por defecto: Más recientes (usando la fecha de creación)
+    filteredAndSorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
+
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-8 mt-4 mb-20">
       
-      {/* Banner Principal Responsivo */}
+      {/* MENÚ LATERAL DE CATEGORÍAS (Overlay oculto) */}
+      {isSidebarOpen && (
+        <div className="fixed inset-0 z-[100] flex">
+          {/* Fondo oscuro que al tocarlo cierra el menú */}
+          <div 
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsSidebarOpen(false)}
+          ></div>
+          
+          {/* Panel Lateral */}
+          <div className="relative w-72 max-w-[80%] bg-gray-900 h-full p-6 shadow-2xl flex flex-col border-r border-gray-700 animate-slide-right">
+            <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
+              <h2 className="text-xl font-black text-white flex items-center gap-2">
+                <span>📁</span> Categorías
+              </h2>
+              <button 
+                onClick={() => setIsSidebarOpen(false)}
+                className="bg-gray-800 p-2 rounded-lg text-gray-400 hover:text-white hover:bg-red-500/20 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+            
+            <div className="flex flex-col gap-2 overflow-y-auto custom-scrollbar flex-grow pr-2">
+              {categories.map((category, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setSelectedCategory(category);
+                    setIsSidebarOpen(false); // Cierra el menú al elegir
+                  }}
+                  className={`text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${
+                    selectedCategory === category 
+                      ? 'bg-[#FF9980] text-gray-900 shadow-md' 
+                      : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800 hover:text-white'
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Banner Principal */}
       <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-3xl p-6 sm:p-12 mb-8 border border-gray-700 shadow-2xl relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-6">
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-[#FF9980] rounded-full blur-[100px] opacity-20"></div>
         <div className="relative z-10 text-center sm:text-left">
           <span className="bg-[#FF9980]/20 text-[#FF9980] px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest mb-4 inline-block border border-[#FF9980]/30">
             Catálogo Online
           </span>
-          
-          {/* ========================================================= */}
-          {/* ⚠️ ACÁ PODÉS RESTAURAR TU FRASE ORIGINAL EXACTA ⚠️ */}
-          {/* ========================================================= */}
           <h1 className="text-3xl sm:text-5xl font-black text-white mb-4 leading-tight">
             Todo lo que buscás, <br className="hidden sm:block" />
             <span className="text-[#FF9980]">en un solo lugar.</span>
@@ -76,55 +129,73 @@ export default function Home() {
         </div>
       </div>
 
-      {/* RESTAURADO: Buscador y Filtros */}
-      <div className="bg-gray-800 p-4 sm:p-6 rounded-2xl border border-gray-700 mb-8 shadow-lg sticky top-24 z-40">
-        <div className="flex flex-col gap-4">
+      {/* BARRA DE HERRAMIENTAS: Búsqueda, Menú y Orden */}
+      <div className="bg-gray-800 p-4 rounded-2xl border border-gray-700 mb-8 shadow-lg sticky top-24 z-40">
+        <div className="flex flex-col gap-3">
           
-          {/* Barra de Búsqueda */}
-          <div className="relative w-full">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          {/* Fila 1: Menú Hamburguesa + Buscador */}
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="bg-gray-900 p-3 sm:p-4 rounded-xl border border-gray-600 text-gray-100 hover:border-[#FF9980] hover:text-[#FF9980] transition-colors shadow-inner flex-shrink-0"
+              title="Abrir Categorías"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+            
+            <div className="relative flex-grow">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Buscar productos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-gray-900 border border-gray-600 rounded-xl pl-10 pr-4 py-3 sm:py-4 text-sm sm:text-base text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors shadow-inner"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Buscar productos por nombre..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-600 rounded-xl pl-12 pr-4 py-3 sm:py-4 text-sm sm:text-base text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors shadow-inner"
-            />
           </div>
 
-          {/* Botones de Categorías Dinámicos */}
-          <div className="flex overflow-x-auto gap-2 pb-2 custom-scrollbar">
-            {categories.map((category, index) => (
-              <button
-                key={index}
-                onClick={() => setSelectedCategory(category)}
-                className={`whitespace-nowrap px-5 py-2.5 rounded-xl font-bold text-sm transition-all border ${
-                  selectedCategory === category 
-                    ? 'bg-[#FF9980] text-gray-900 border-[#FF9980] shadow-md transform scale-105' 
-                    : 'bg-gray-900 text-gray-400 border-gray-700 hover:border-[#FF9980]/50 hover:text-white'
-                }`}
+          {/* Fila 2: Indicador de categoría actual + Filtro de Orden */}
+          <div className="flex justify-between items-center bg-gray-900/50 p-2 sm:p-3 rounded-xl border border-gray-700/50">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 uppercase font-bold tracking-wider hidden sm:block">Categoría:</span>
+              <span className="bg-[#FF9980]/10 text-[#FF9980] px-3 py-1 rounded-md text-xs font-bold border border-[#FF9980]/20 truncate max-w-[150px] sm:max-w-xs">
+                {selectedCategory}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 hidden sm:block"><path d="M3 3h18v18H3zM12 8v8m-4-4h8"/></svg>
+              <select 
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="bg-gray-800 border border-gray-600 text-gray-200 text-xs sm:text-sm rounded-lg focus:outline-none focus:border-[#FF9980] py-1.5 px-2 appearance-none cursor-pointer"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23FF9980'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1em', paddingRight: '2rem' }}
               >
-                {category}
-              </button>
-            ))}
+                <option value="recientes">Novedades (Recientes)</option>
+                <option value="menor_precio">Menor Precio</option>
+                <option value="mayor_precio">Mayor Precio</option>
+              </select>
+            </div>
           </div>
 
         </div>
       </div>
 
-      {/* RESULTADOS Y GRILLA DE PRODUCTOS */}
+      {/* TITULO DE RESULTADOS */}
       <div className="flex justify-between items-end mb-6 border-b border-gray-700 pb-4">
         <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
           <span>{filteredProducts.length > 0 ? '🔥' : '🔍'}</span> 
-          {searchTerm || selectedCategory !== 'Todas' ? 'Resultados de tu búsqueda' : 'Catálogo Completo'}
+          {searchTerm || selectedCategory !== 'Todas' ? 'Resultados' : 'Catálogo Completo'}
         </h2>
         <span className="text-gray-400 text-xs sm:text-sm font-bold bg-gray-800 px-3 py-1 rounded-full border border-gray-700">
           {filteredProducts.length} productos
         </span>
       </div>
 
+      {/* GRILLA DE PRODUCTOS */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20">
           <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-[#FF9980]"></div>
@@ -134,7 +205,7 @@ export default function Home() {
         <div className="text-center py-20 bg-gray-800/50 rounded-3xl border border-dashed border-gray-700">
           <span className="text-6xl block mb-4 opacity-50">📦</span>
           <h3 className="text-xl font-bold text-gray-300 mb-2">No encontramos nada</h3>
-          <p className="text-gray-500">Probá buscando con otras palabras o cambiá de categoría.</p>
+          <p className="text-gray-500 text-sm sm:text-base">Probá buscando con otras palabras o cambiá de categoría en el menú.</p>
           <button 
             onClick={() => {setSearchTerm(''); setSelectedCategory('Todas');}}
             className="mt-6 bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-bold transition-colors"
@@ -143,7 +214,6 @@ export default function Home() {
           </button>
         </div>
       ) : (
-        /* MANTENEMOS EL DISEÑO CELULAR: grid-cols-2 */
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
           {filteredProducts.map((product) => (
             <div key={product.id} className="bg-gray-800 rounded-xl sm:rounded-2xl border border-gray-700 shadow-lg overflow-hidden flex flex-col hover:border-[#FF9980]/50 transition-all group">
@@ -184,6 +254,17 @@ export default function Home() {
           ))}
         </div>
       )}
+
+      {/* ANIMACIÓN TAILWIND (Agregada en línea para el menú lateral) */}
+      <style jsx global>{`
+        @keyframes slide-right {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(0); }
+        }
+        .animate-slide-right {
+          animation: slide-right 0.3s ease-out forwards;
+        }
+      `}</style>
 
       {addedToast && (
         <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 w-11/12 max-w-sm bg-[#25D366] text-gray-900 px-6 py-4 rounded-2xl shadow-2xl font-black text-sm flex items-center justify-center gap-3 z-50 animate-bounce">
