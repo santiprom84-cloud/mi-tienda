@@ -10,7 +10,6 @@ export function AuthProvider({ children }) {
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
-    // 1. Revisar si ya hay una sesión iniciada al entrar a la página
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user || null);
@@ -19,13 +18,38 @@ export function AuthProvider({ children }) {
     
     getSession();
 
-    // 2. Escuchar cambios (si el usuario inicia o cierra sesión en otra pestaña)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // NUEVO: Sistema de Presencia (Radar de usuarios online)
+  useEffect(() => {
+    let presenceChannel;
+    
+    if (user) {
+      // Nos unimos al canal global de usuarios online
+      presenceChannel = supabase.channel('online-users');
+      
+      presenceChannel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          // Avisamos al servidor quiénes somos y que entramos
+          await presenceChannel.track({
+            email: user.email,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+    }
+
+    return () => {
+      if (presenceChannel) {
+        supabase.removeChannel(presenceChannel);
+      }
+    };
+  }, [user]);
 
   const logout = async () => {
     await supabase.auth.signOut();
