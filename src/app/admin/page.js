@@ -16,22 +16,18 @@ export default function AdminDashboard() {
   
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pedidos'); 
-
-  // Buscador de productos del Admin
   const [adminProductSearch, setAdminProductSearch] = useState('');
 
-  // Estado para el botón de la IA
+  // ESTADOS DE LA IA
   const [isClassifying, setIsClassifying] = useState(false);
+  const [classifyProgress, setClassifyProgress] = useState(''); // NUEVO: Para mostrar en qué lote vamos
 
-  // Estados del Formulario de Productos
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [productForm, setProductForm] = useState({
     name: '', price: '', category: '', image: '', description: ''
   });
   const [savingProduct, setSavingProduct] = useState(false);
-
-  // Estados para Drag & Drop de imágenes
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -99,23 +95,42 @@ export default function AdminDashboard() {
     }
   };
 
-  // FUNCIÓN ACTUALIZADA: Disparar la clasificación de la IA
+  // NUEVA FUNCIÓN OPTIMIZADA: Clasificación por lotes
   const handleClassifyAI = async () => {
-    if (!window.confirm("¿Estás seguro de que querés que la IA analice y reordene TODOS tus productos en las 5 categorías principales? Esto actualizará las categorías actuales.")) return;
+    if (!window.confirm("¿Estás seguro de reordenar TODO tu catálogo? Esto puede demorar unos minutos ya que se procesará en partes para no saturar el servidor.")) return;
     
     setIsClassifying(true);
     try {
-      const res = await fetch('/api/classify', { method: 'POST' });
-      const data = await res.json();
+      const batchSize = 30; // 30 productos por llamada a la IA
+      const totalBatches = Math.ceil(adminProducts.length / batchSize);
+      let procesados = 0;
+
+      // Iteramos el catálogo cortándolo en pedacitos
+      for (let i = 0; i < adminProducts.length; i += batchSize) {
+        const lote = adminProducts.slice(i, i + batchSize);
+        const numeroLote = Math.floor(i / batchSize) + 1;
+        
+        setClassifyProgress(`Lote ${numeroLote} de ${totalBatches}...`);
+
+        const res = await fetch('/api/classify', { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lote })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Error procesando un lote');
+        
+        procesados += data.count || lote.length;
+      }
       
-      if (!res.ok) throw new Error(data.error || 'Error en el servidor');
-      
-      alert(data.message);
-      fetchAdminData(); // Recargamos la tabla para ver los cambios
+      alert(`¡Éxito total! La IA ordenó exitosamente ${procesados} productos.`);
+      fetchAdminData(); 
     } catch (error) {
       alert(`Error al clasificar: ${error.message}`);
     } finally {
       setIsClassifying(false);
+      setClassifyProgress('');
     }
   };
 
@@ -286,6 +301,7 @@ export default function AdminDashboard() {
                 />
               </div>
 
+              {/* BOTÓN MÁGICO DE IA ACTUALIZADO */}
               <button 
                 onClick={handleClassifyAI} 
                 disabled={isClassifying}
@@ -293,9 +309,9 @@ export default function AdminDashboard() {
                 title="Re-clasificar TODOS los productos automáticamente"
               >
                 {isClassifying ? (
-                  <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div> Procesando...</>
+                  <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div> {classifyProgress || 'Procesando...'}</>
                 ) : (
-                  <>✨ Ordenar Todo con IA (Gratis)</>
+                  <>✨ Ordenar Todo con IA</>
                 )}
               </button>
 
@@ -457,14 +473,6 @@ export default function AdminDashboard() {
                       {order.status === 'pendiente' && <span className="bg-yellow-900/50 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold uppercase border border-yellow-800/50">Pendiente</span>}
                       {order.status === 'pagado' && <span className="bg-green-900/50 text-green-400 px-3 py-1 rounded-full text-xs font-bold uppercase border border-green-800/50">Pagado</span>}
                       {order.status === 'enviado' && <span className="bg-blue-900/50 text-blue-400 px-3 py-1 rounded-full text-xs font-bold uppercase border border-blue-800/50">Enviado</span>}
-                    </div>
-                  </div>
-                  <div className="p-5 border-b border-gray-700 bg-gray-800/50">
-                    <h4 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2"><span>👤</span> Datos del comprador</h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div><p className="text-gray-500 text-xs">Email</p><p className="font-bold text-gray-200 truncate">{order.user_email || 'Sin registro'}</p></div>
-                      <div><p className="text-gray-500 text-xs">Nombre</p><p className="font-bold text-gray-200 truncate">{order.user_name || 'No cargado'}</p></div>
-                      <div className="col-span-2"><p className="text-gray-500 text-xs">Teléfono / WhatsApp</p><p className="font-bold text-gray-200">{order.user_phone || 'No cargado'}</p></div>
                     </div>
                   </div>
                   <div className="p-5 flex-grow">
