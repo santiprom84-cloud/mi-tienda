@@ -12,46 +12,51 @@ export async function POST(req) {
       return NextResponse.json({ message: "Lote vacío." });
     }
 
+    // Adaptamos ligeramente el prompt para Llama 3
     const prompt = `
       Eres un experto en e-commerce. Analiza estos productos y asígnales una categoría.
       Sugerencias: Tecnología y Gaming, Bazar y Hogar, Deportes y Tiempo Libre, Librería y Estudio, Accesorios y Telefonía.
-      REGLA: Si no encajan, PUEDES CREAR NUEVAS categorías cortas (Ej: Juguetería, Indumentaria, Niños, Ferretería). 
-      Devuelve SOLO un JSON válido con este formato exacto: [{"id": "id", "category": "Categoria"}]
-      Productos:
+      REGLA: Si no encajan, CREA NUEVAS categorías cortas (Ej: Juguetería, Indumentaria, Niños, Ferretería). 
+      Devuelve SOLO un JSON válido con este formato exacto que contenga el array 'productos':
+      { "productos": [{"id": "id_del_producto", "category": "Categoria"}] }
+      
+      Productos a clasificar:
       ${JSON.stringify(lote.map(p => ({id: p.id, name: p.name, description: p.description})))}
     `;
 
-    // VOLVEMOS AL MODELO FLASH: 100% gratuito, veloz y sin bloqueos de facturación
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+    // Conectamos con la API ultrarrápida de Groq usando Llama 3
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { response_mime_type: "application/json" }
+        model: "llama3-8b-8192", // Modelo súper rápido y gratuito
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" }, // Forzamos JSON perfecto
+        temperature: 0.2
       })
     });
 
     if (!response.ok) {
       const errData = await response.text();
-      console.error("ERROR CRÍTICO DE GOOGLE:", errData);
-      throw new Error(`Google rechazó la API Key o el modelo (Status: ${response.status}).`);
+      console.error("Error desde Groq:", errData);
+      throw new Error(`Groq rechazó la conexión (Status: ${response.status}).`);
     }
 
     const result = await response.json();
+    const text = result.choices[0].message.content;
     
-    if (result.error) {
-      throw new Error(result.error.message);
+    // Extraemos el JSON
+    const parsedData = JSON.parse(text);
+    const clasificaciones = parsedData.productos;
+
+    if (!clasificaciones || !Array.isArray(clasificaciones)) {
+      throw new Error("La IA no devolvió el array de productos correctamente.");
     }
 
-    let text = result.candidates[0].content.parts[0].text;
-    
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      throw new Error("La IA no devolvió un formato JSON válido.");
-    }
-
-    const clasificaciones = JSON.parse(jsonMatch[0]);
-
+    // Guardamos en Supabase
     await Promise.all(clasificaciones.map(item => {
       if(item.id && item.category) {
         return supabase.from('productos').update({ category: item.category }).eq('id', item.id);
