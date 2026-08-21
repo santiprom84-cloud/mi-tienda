@@ -21,7 +21,7 @@ export async function POST(req) {
       Descripción: ${description || 'Sin descripción'}
     `;
 
-    // Conexión súper rápida a Groq usando el NUEVO modelo Llama 3.1
+    // SOLUCIÓN: Usamos Mixtral, el modelo histórico y más estable de Groq.
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 
@@ -29,7 +29,7 @@ export async function POST(req) {
         'Content-Type': 'application/json' 
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant", // <-- Modelo actualizado y activo
+        model: "mixtral-8x7b-32768", 
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" }, 
         temperature: 0.1
