@@ -18,7 +18,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('pedidos'); 
   const [adminProductSearch, setAdminProductSearch] = useState('');
 
-  // ESTADOS DEL MODO SEGURO IA LOTE
+  // ESTADOS DEL MODO SEGURO IA MASIVO
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [aiPromptText, setAiPromptText] = useState('');
   const [aiResponseText, setAiResponseText] = useState('');
@@ -31,7 +31,7 @@ export default function AdminDashboard() {
     name: '', price: '', category: '', image: '', description: ''
   });
   
-  // Nuevo estado para indicar que la IA está analizando el producto individual
+  // Estados de guardado e IA Individual
   const [savingProduct, setSavingProduct] = useState(false);
   const [isAutoClassifying, setIsAutoClassifying] = useState(false); 
   
@@ -102,12 +102,12 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- MODO SEGURO IA (Lotes) ---
+  // --- MODO SEGURO IA (Catálogo Masivo) ---
   const openAIModal = () => {
     const productsToClassify = adminProducts.map(p => ({ id: p.id, name: p.name }));
     const prompt = `Eres un experto en e-commerce. Analiza estos productos y asígnales una categoría principal.
 Usa estas sugerencias base: "Tecnología y Gaming", "Bazar y Parrilla", "Deportes y Tiempo Libre", "Librería y Estudio", "Accesorios y Telefonía".
-REGLA VITAL: Si el producto no encaja, DEBES CREAR una nueva categoría corta (Ej: "Juguetería", "Niños", "Hogar").
+REGLA VITAL: Si el producto no encaja, DEBES CREAR una nueva categoría corta (Ej: "Juguetería", "Niños", "Hogar", "Indumentaria").
 Devuelve SOLO un JSON válido (sin texto antes ni después) con este formato exacto:
 [
   {"id": "el_id_aqui", "category": "Categoria Asignada"}
@@ -155,10 +155,10 @@ ${JSON.stringify(productsToClassify)}`;
 
   const copyPromptToClipboard = () => {
     navigator.clipboard.writeText(aiPromptText);
-    alert("¡Comando copiado! Pegalo en ChatGPT, Gemini o Claude.");
+    alert("¡Comando copiado! Pegalo en ChatGPT o Gemini.");
   };
 
-  // --- FUNCIONES DE PRODUCTOS (Crear, Editar, Borrar) ---
+  // --- FUNCIONES DE PRODUCTOS ---
   const openProductModal = (product = null) => {
     if (product) {
       setEditingProduct(product);
@@ -172,7 +172,7 @@ ${JSON.stringify(productsToClassify)}`;
     setIsProductModalOpen(true);
   };
 
-  // FUNCIÓN GUARDAR PRODUCTO ACTUALIZADA CON AUTO-CLASIFICACIÓN IA
+  // FUNCIÓN GUARDAR PRODUCTO: Conexión segura al Backend para 1 solo producto
   const saveProduct = async (e) => {
     e.preventDefault();
     setSavingProduct(true);
@@ -180,7 +180,7 @@ ${JSON.stringify(productsToClassify)}`;
     try {
       let finalCategory = productForm.category;
 
-      // Magia IA: Si la categoría está vacía, pedimos al micro-cerebro que la infiera
+      // Magia IA Individual: Consultamos a nuestro micro-backend
       if (!finalCategory || finalCategory.trim() === '') {
         setIsAutoClassifying(true);
         try {
@@ -192,12 +192,12 @@ ${JSON.stringify(productsToClassify)}`;
           
           if (res.ok) {
             const data = await res.json();
-            finalCategory = data.category; // Aplicamos la decisión de la IA
+            finalCategory = data.category; 
           } else {
             finalCategory = "Sin Clasificar";
           }
         } catch (iaError) {
-          console.error("Error auto-clasificando:", iaError);
+          console.error("Error contactando al servidor:", iaError);
           finalCategory = "Sin Clasificar";
         } finally {
           setIsAutoClassifying(false);
@@ -207,7 +207,7 @@ ${JSON.stringify(productsToClassify)}`;
       const productData = {
         name: productForm.name,
         price: Number(productForm.price),
-        category: finalCategory, // Guarda la categoría escrita o la de la IA
+        category: finalCategory,
         image: productForm.image,
         description: productForm.description
       };
@@ -357,7 +357,8 @@ ${JSON.stringify(productsToClassify)}`;
 
               <button 
                 onClick={openAIModal}
-                className="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 text-white font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2"
+                className="w-full sm:w-auto bg-[#FF9980]/20 hover:bg-[#FF9980]/30 text-[#FF9980] border border-[#FF9980]/50 font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2"
+                title="Herramienta a prueba de fallos para ordenar el catálogo usando ChatGPT"
               >
                 🧠 Reordenar Catálogo
               </button>
@@ -537,7 +538,7 @@ ${JSON.stringify(productsToClassify)}`;
                       value={productForm.category} 
                       onChange={(e) => setProductForm({...productForm, category: e.target.value})} 
                       className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors" 
-                      placeholder="Dejala en blanco para usar IA" 
+                      placeholder="Dejala vacía para que la asigne la IA" 
                     />
                   </div>
                 </div>
