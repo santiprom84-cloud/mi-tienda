@@ -18,7 +18,6 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('pedidos'); 
   const [adminProductSearch, setAdminProductSearch] = useState('');
 
-  // ESTADOS DE LA IA
   const [isClassifying, setIsClassifying] = useState(false);
   const [classifyProgress, setClassifyProgress] = useState('');
 
@@ -95,20 +94,13 @@ export default function AdminDashboard() {
     }
   };
 
-  // NUEVA ARQUITECTURA: IA Ejecutada directamente en el Frontend
+  // ARQUITECTURA SÁNDWICH: Frontend orquesta, Backend consulta a Groq, Frontend guarda en BD
   const handleClassifyAI = async () => {
-    const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY;
-    
-    if (!apiKey) {
-      alert("❌ ERROR: Vercel no está leyendo la variable NEXT_PUBLIC_GROQ_API_KEY. Revisá la configuración en Vercel y hacé un nuevo despliegue.");
-      return;
-    }
-
-    if (!window.confirm("¿Estás listo para que Groq (Llama 3) reordene TODO tu catálogo?")) return;
+    if (!window.confirm("¿Listo para el escaneo final? Reordenaremos todo el catálogo de forma segura.")) return;
     
     setIsClassifying(true);
     try {
-      const batchSize = 10; 
+      const batchSize = 5; // Lotes chiquitos para volar por debajo del radar de timeout
       const totalBatches = Math.ceil(adminProducts.length / batchSize);
       let procesados = 0;
       let errores = 0;
@@ -120,64 +112,39 @@ export default function AdminDashboard() {
         setClassifyProgress(`Lote ${numeroLote} de ${totalBatches}...`);
 
         try {
-          const prompt = `
-            Eres un experto en e-commerce. Analiza estos productos y asígnales una categoría.
-            Sugerencias: Tecnología y Gaming, Bazar y Hogar, Deportes y Tiempo Libre, Librería y Estudio, Accesorios y Telefonía.
-            REGLA: Si no encajan, CREA NUEVAS categorías (Ej: Juguetería, Indumentaria, Ferretería).
-            Devuelve SOLO un JSON válido con esta estructura exacta:
-            { "productos": [{"id": "id_del_producto", "category": "Categoria"}] }
-            
-            Productos a clasificar:
-            ${JSON.stringify(lote.map(p => ({id: p.id, name: p.name, description: p.description})))}
-          `;
-
-          // Conexión directa a Groq desde el panel
-          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          // 1. Pedimos al backend que haga la llamada a Groq
+          const res = await fetch('/api/classify', {
             method: 'POST',
-            headers: { 
-              'Authorization': `Bearer ${apiKey}`,
-              'Content-Type': 'application/json' 
-            },
-            body: JSON.stringify({
-              model: "llama3-8b-8192",
-              messages: [{ role: "user", content: prompt }],
-              response_format: { type: "json_object" },
-              temperature: 0.2
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lote })
           });
           
-          if (!res.ok) {
-            const errText = await res.text();
-            throw new Error(`Groq rechazó la conexión: ${res.status} - ${errText}`);
-          }
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Error en la respuesta del servidor');
 
-          const result = await res.json();
-          const text = result.choices[0].message.content;
-          const parsedData = JSON.parse(text);
-          const clasificaciones = parsedData.productos;
-
-          // Guardamos en Supabase directamente
-          for (const item of clasificaciones) {
-            if (item.id && item.category) {
-              await supabase.from('productos').update({ category: item.category }).eq('id', item.id);
+          // 2. El Frontend, con tu sesión activa, guarda los cambios en Supabase
+          if (data.clasificaciones && Array.isArray(data.clasificaciones)) {
+            for (const item of data.clasificaciones) {
+              if (item.id && item.category) {
+                await supabase.from('productos').update({ category: item.category.trim() }).eq('id', item.id);
+                procesados++;
+              }
             }
           }
-          
-          procesados += clasificaciones.length;
         } catch (batchError) {
           console.error(`Fallo crítico en el lote ${numeroLote}:`, batchError);
           errores++;
         }
 
-        // Pausa breve para Groq
+        // Respirito para la API gratuita
         if (numeroLote < totalBatches) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
       
-      let mensajeFinal = `¡Proceso terminado! Se ordenaron ${procesados} productos con éxito.`;
+      let mensajeFinal = `¡Proceso terminado magistralmente! Se ordenaron ${procesados} productos con éxito.`;
       if (errores > 0) {
-        mensajeFinal += `\nHubo problemas con ${errores} lote(s).`;
+        mensajeFinal += `\nHubo problemas con ${errores} lote(s). Tocá de nuevo el botón para procesar los que quedaron.`;
       }
       
       alert(mensajeFinal);
@@ -357,12 +324,12 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* BOTÓN MÁGICO DE GROQ */}
+              {/* BOTÓN MÁGICO FINAL */}
               <button 
                 onClick={handleClassifyAI} 
                 disabled={isClassifying}
                 className="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 disabled:transform-none flex items-center justify-center gap-2"
-                title="Re-clasificar TODOS los productos automáticamente usando Groq"
+                title="Clasificación blindada con Groq"
               >
                 {isClassifying ? (
                   <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div> {classifyProgress}</>
@@ -629,7 +596,7 @@ export default function AdminDashboard() {
 
       <style jsx global>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        .animate-fade-in { animation: fadeIn 0.3s forwards; }
       `}</style>
     </div>
   );
