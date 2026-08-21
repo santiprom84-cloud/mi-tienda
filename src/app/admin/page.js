@@ -20,7 +20,7 @@ export default function AdminDashboard() {
   // Buscador de productos del Admin
   const [adminProductSearch, setAdminProductSearch] = useState('');
 
-  // NUEVO: Estado para el botón de la IA
+  // Estado para el botón de la IA
   const [isClassifying, setIsClassifying] = useState(false);
 
   // Estados del Formulario de Productos
@@ -99,9 +99,9 @@ export default function AdminDashboard() {
     }
   };
 
-  // NUEVA FUNCIÓN: Disparar la clasificación de la IA
+  // FUNCIÓN ACTUALIZADA: Disparar la clasificación de la IA
   const handleClassifyAI = async () => {
-    if (!window.confirm("¿Querés que la IA analice y asigne categorías automáticamente a los productos que no tienen una?")) return;
+    if (!window.confirm("¿Estás seguro de que querés que la IA analice y reordene TODOS tus productos en las 5 categorías principales? Esto actualizará las categorías actuales.")) return;
     
     setIsClassifying(true);
     try {
@@ -271,7 +271,6 @@ export default function AdminDashboard() {
               <p className="text-gray-400 text-sm">Gestioná los {adminProducts.length} productos de tu tienda.</p>
             </div>
             
-            {/* ZONA DE BOTONES Y BUSCADOR */}
             <div className="flex flex-col sm:flex-row w-full xl:w-auto gap-3">
               
               <div className="relative w-full sm:w-64">
@@ -287,17 +286,16 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* BOTÓN MÁGICO DE IA */}
               <button 
                 onClick={handleClassifyAI} 
                 disabled={isClassifying}
                 className="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 disabled:transform-none flex items-center justify-center gap-2"
-                title="Clasificar productos sin categoría automáticamente"
+                title="Re-clasificar TODOS los productos automáticamente"
               >
                 {isClassifying ? (
                   <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div> Procesando...</>
                 ) : (
-                  <>✨ Ordenar con IA (Gratis)</>
+                  <>✨ Ordenar Todo con IA (Gratis)</>
                 )}
               </button>
 
@@ -459,6 +457,14 @@ export default function AdminDashboard() {
                       {order.status === 'pendiente' && <span className="bg-yellow-900/50 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold uppercase border border-yellow-800/50">Pendiente</span>}
                       {order.status === 'pagado' && <span className="bg-green-900/50 text-green-400 px-3 py-1 rounded-full text-xs font-bold uppercase border border-green-800/50">Pagado</span>}
                       {order.status === 'enviado' && <span className="bg-blue-900/50 text-blue-400 px-3 py-1 rounded-full text-xs font-bold uppercase border border-blue-800/50">Enviado</span>}
+                    </div>
+                  </div>
+                  <div className="p-5 border-b border-gray-700 bg-gray-800/50">
+                    <h4 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2"><span>👤</span> Datos del comprador</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div><p className="text-gray-500 text-xs">Email</p><p className="font-bold text-gray-200 truncate">{order.user_email || 'Sin registro'}</p></div>
+                      <div><p className="text-gray-500 text-xs">Nombre</p><p className="font-bold text-gray-200 truncate">{order.user_name || 'No cargado'}</p></div>
+                      <div className="col-span-2"><p className="text-gray-500 text-xs">Teléfono / WhatsApp</p><p className="font-bold text-gray-200">{order.user_phone || 'No cargado'}</p></div>
                     </div>
                   </div>
                   <div className="p-5 flex-grow">
