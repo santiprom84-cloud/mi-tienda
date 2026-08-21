@@ -18,7 +18,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('pedidos'); 
   const [adminProductSearch, setAdminProductSearch] = useState('');
 
-  // ESTADOS DEL MODO SEGURO IA MASIVO
+  // ESTADOS DEL MODO SEGURO IA MASIVO (Este sí funciona y lo dejamos)
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [aiPromptText, setAiPromptText] = useState('');
   const [aiResponseText, setAiResponseText] = useState('');
@@ -28,16 +28,27 @@ export default function AdminDashboard() {
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [productForm, setProductForm] = useState({
-    name: '', price: '', category: '', image: '', description: ''
+    name: '', price: '', category: '', customCategory: '', image: '', description: ''
   });
   
   const [savingProduct, setSavingProduct] = useState(false);
-  const [isAutoClassifying, setIsAutoClassifying] = useState(false); 
-  
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
   const ADMIN_EMAIL = 'santiprom84@gmail.com';
+
+  // Categorías predefinidas para el Dropdown (A prueba de fallos)
+  const CATEGORIAS_BASE = [
+    "Tecnología y Gaming",
+    "Bazar y Hogar",
+    "Deportes y Tiempo Libre",
+    "Librería y Estudio",
+    "Accesorios y Telefonía",
+    "Indumentaria",
+    "Juguetería",
+    "Ferretería",
+    "Otra..." // Opción para escribir a mano
+  ];
 
   useEffect(() => {
     if (!loadingAuth) {
@@ -105,8 +116,7 @@ export default function AdminDashboard() {
   const openAIModal = () => {
     const productsToClassify = adminProducts.map(p => ({ id: p.id, name: p.name }));
     const prompt = `Eres un experto en e-commerce. Analiza estos productos y asígnales una categoría principal.
-Usa estas sugerencias base: "Tecnología y Gaming", "Bazar y Parrilla", "Deportes y Tiempo Libre", "Librería y Estudio", "Accesorios y Telefonía".
-REGLA VITAL: Si el producto no encaja, DEBES CREAR una nueva categoría corta (Ej: "Juguetería", "Niños", "Hogar", "Indumentaria").
+Usa estas sugerencias base: "Tecnología y Gaming", "Bazar y Parrilla", "Deportes y Tiempo Libre", "Librería y Estudio", "Accesorios y Telefonía", "Indumentaria", "Juguetería".
 Devuelve SOLO un JSON válido (sin texto antes ni después) con este formato exacto:
 [
   {"id": "el_id_aqui", "category": "Categoria Asignada"}
@@ -157,51 +167,40 @@ ${JSON.stringify(productsToClassify)}`;
     alert("¡Comando copiado! Pegalo en ChatGPT o Gemini.");
   };
 
+  // --- FUNCIONES DE PRODUCTOS ROBUSTAS ---
   const openProductModal = (product = null) => {
     if (product) {
+      // Determinamos si la categoría del producto está en la lista base
+      const isKnownCategory = CATEGORIAS_BASE.includes(product.category);
       setEditingProduct(product);
       setProductForm({
-        name: product.name || '', price: product.price || '', category: product.category || '', image: product.image || '', description: product.description || ''
+        name: product.name || '', 
+        price: product.price || '', 
+        category: isKnownCategory ? product.category : 'Otra...', 
+        customCategory: isKnownCategory ? '' : (product.category || ''), 
+        image: product.image || '', 
+        description: product.description || ''
       });
     } else {
       setEditingProduct(null);
-      setProductForm({ name: '', price: '', category: '', image: '', description: '' });
+      setProductForm({ name: '', price: '', category: CATEGORIAS_BASE[0], customCategory: '', image: '', description: '' });
     }
     setIsProductModalOpen(true);
   };
 
-  // FUNCIÓN GUARDAR PRODUCTO: Con detección de errores visibles
+  // FUNCIÓN GUARDAR: Rápida, sin APIs externas, 100% infalible
   const saveProduct = async (e) => {
     e.preventDefault();
     setSavingProduct(true);
     
     try {
-      let finalCategory = productForm.category;
+      // Si eligió "Otra...", usamos lo que escribió a mano. Si no, usamos lo que seleccionó.
+      let finalCategory = productForm.category === 'Otra...' 
+        ? productForm.customCategory.trim() 
+        : productForm.category;
 
-      if (!finalCategory || finalCategory.trim() === '') {
-        setIsAutoClassifying(true);
-        try {
-          const res = await fetch('/api/classify-single', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: productForm.name, description: productForm.description })
-          });
-          
-          const data = await res.json();
-          
-          if (res.ok && data.category) {
-            finalCategory = data.category; 
-          } else {
-            // AHORA SÍ TE VA A DECIR QUÉ ESTÁ FALLANDO
-            alert(`⚠️ Error de IA: ${data.error}. Se guardará como 'Sin Clasificar'.`);
-            finalCategory = "Sin Clasificar";
-          }
-        } catch (iaError) {
-          alert(`⚠️ Falla de conexión con servidor: ${iaError.message}. Se guardará como 'Sin Clasificar'.`);
-          finalCategory = "Sin Clasificar";
-        } finally {
-          setIsAutoClassifying(false);
-        }
+      if (!finalCategory) {
+        finalCategory = "Sin Clasificar";
       }
 
       const productData = {
@@ -357,9 +356,10 @@ ${JSON.stringify(productsToClassify)}`;
 
               <button 
                 onClick={openAIModal}
-                className="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 text-white font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2"
+                className="w-full sm:w-auto bg-[#FF9980]/20 hover:bg-[#FF9980]/30 text-[#FF9980] border border-[#FF9980]/50 font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2"
+                title="Herramienta a prueba de fallos para ordenar el catálogo usando ChatGPT"
               >
-                🧠 Ordenar con IA (Modo Seguro)
+                🧠 Reordenar Catálogo
               </button>
 
               <button onClick={() => openProductModal()} className="w-full sm:w-auto bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-6 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2">
@@ -464,7 +464,7 @@ ${JSON.stringify(productsToClassify)}`;
         </div>
       )}
 
-      {/* MODAL: CREAR / EDITAR PRODUCTO */}
+      {/* MODAL: CREAR / EDITAR PRODUCTO CON DROPDOWN INFALIBLE */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsProductModalOpen(false)}></div>
@@ -530,15 +530,31 @@ ${JSON.stringify(productsToClassify)}`;
                     <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Precio ($) *</label>
                     <input type="number" required min="0" step="0.01" value={productForm.price} onChange={(e) => setProductForm({...productForm, price: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors" placeholder="Ej: 15500" />
                   </div>
+                  
+                  {/* SELECTOR MANUAL: Cero fallos, cero APIs */}
                   <div>
-                    <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Categoría (Opcional)</label>
-                    <input 
-                      type="text" 
+                    <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Categoría *</label>
+                    <select 
                       value={productForm.category} 
-                      onChange={(e) => setProductForm({...productForm, category: e.target.value})} 
-                      className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors" 
-                      placeholder="Dejala vacía para que la asigne la IA" 
-                    />
+                      onChange={(e) => setProductForm({...productForm, category: e.target.value})}
+                      className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors appearance-none cursor-pointer"
+                    >
+                      {CATEGORIAS_BASE.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+
+                    {/* Si selecciona "Otra...", aparece este input para que escriba */}
+                    {productForm.category === 'Otra...' && (
+                      <input 
+                        type="text" 
+                        required
+                        value={productForm.customCategory} 
+                        onChange={(e) => setProductForm({...productForm, customCategory: e.target.value})} 
+                        className="w-full bg-gray-900 border border-gray-500 rounded-xl p-3 mt-3 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors animate-fade-in" 
+                        placeholder="Escribí la nueva categoría..." 
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -553,8 +569,8 @@ ${JSON.stringify(productsToClassify)}`;
             <div className="bg-gray-900 p-6 border-t border-gray-700 flex justify-end gap-3 shrink-0">
               <button type="button" onClick={() => setIsProductModalOpen(false)} className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">Cancelar</button>
               
-              <button type="submit" form="productForm" disabled={savingProduct || uploadingImage || isAutoClassifying} className="bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-8 py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none flex items-center gap-2">
-                {isAutoClassifying ? '🧠 Analizando Categoría...' : savingProduct ? 'Guardando...' : 'Guardar Producto'}
+              <button type="submit" form="productForm" disabled={savingProduct || uploadingImage} className="bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-8 py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none flex items-center gap-2">
+                {savingProduct ? 'Guardando...' : 'Guardar Producto'}
               </button>
             </div>
 
