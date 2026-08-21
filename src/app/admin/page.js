@@ -95,9 +95,16 @@ export default function AdminDashboard() {
     }
   };
 
-  // FUNCIÓN ULTRA-RESILIENTE PARA CLASIFICAR CON PAUSA LARGA
+  // NUEVA ARQUITECTURA: IA Ejecutada directamente en el Frontend
   const handleClassifyAI = async () => {
-    if (!window.confirm("¿Reordenar TODO el catálogo? Este proceso tomará un par de minutos para respetar los límites de seguridad de Google Gemini.")) return;
+    const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY;
+    
+    if (!apiKey) {
+      alert("❌ ERROR: Vercel no está leyendo la variable NEXT_PUBLIC_GROQ_API_KEY. Revisá la configuración en Vercel y hacé un nuevo despliegue.");
+      return;
+    }
+
+    if (!window.confirm("¿Estás listo para que Groq (Llama 3) reordene TODO tu catálogo?")) return;
     
     setIsClassifying(true);
     try {
@@ -113,30 +120,64 @@ export default function AdminDashboard() {
         setClassifyProgress(`Lote ${numeroLote} de ${totalBatches}...`);
 
         try {
-          const res = await fetch('/api/classify', { 
+          const prompt = `
+            Eres un experto en e-commerce. Analiza estos productos y asígnales una categoría.
+            Sugerencias: Tecnología y Gaming, Bazar y Hogar, Deportes y Tiempo Libre, Librería y Estudio, Accesorios y Telefonía.
+            REGLA: Si no encajan, CREA NUEVAS categorías (Ej: Juguetería, Indumentaria, Ferretería).
+            Devuelve SOLO un JSON válido con esta estructura exacta:
+            { "productos": [{"id": "id_del_producto", "category": "Categoria"}] }
+            
+            Productos a clasificar:
+            ${JSON.stringify(lote.map(p => ({id: p.id, name: p.name, description: p.description})))}
+          `;
+
+          // Conexión directa a Groq desde el panel
+          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lote })
+            headers: { 
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify({
+              model: "llama3-8b-8192",
+              messages: [{ role: "user", content: prompt }],
+              response_format: { type: "json_object" },
+              temperature: 0.2
+            })
           });
           
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Error desconocido del servidor');
+          if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`Groq rechazó la conexión: ${res.status} - ${errText}`);
+          }
+
+          const result = await res.json();
+          const text = result.choices[0].message.content;
+          const parsedData = JSON.parse(text);
+          const clasificaciones = parsedData.productos;
+
+          // Guardamos en Supabase directamente
+          for (const item of clasificaciones) {
+            if (item.id && item.category) {
+              await supabase.from('productos').update({ category: item.category }).eq('id', item.id);
+            }
+          }
           
-          procesados += data.count || lote.length;
+          procesados += clasificaciones.length;
         } catch (batchError) {
-          console.error(`Fallo en el lote ${numeroLote}:`, batchError);
+          console.error(`Fallo crítico en el lote ${numeroLote}:`, batchError);
           errores++;
         }
 
-        // PAUSA DE 5 SEGUNDOS: Clave para evadir el "Rate Limit" (429) de Gemini
+        // Pausa breve para Groq
         if (numeroLote < totalBatches) {
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
       
       let mensajeFinal = `¡Proceso terminado! Se ordenaron ${procesados} productos con éxito.`;
       if (errores > 0) {
-        mensajeFinal += `\nHubo problemas con ${errores} lote(s). Podés volver a presionar el botón luego para completar lo faltante.`;
+        mensajeFinal += `\nHubo problemas con ${errores} lote(s).`;
       }
       
       alert(mensajeFinal);
@@ -316,17 +357,17 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* BOTÓN MÁGICO DE IA ACTUALIZADO */}
+              {/* BOTÓN MÁGICO DE GROQ */}
               <button 
                 onClick={handleClassifyAI} 
                 disabled={isClassifying}
                 className="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 disabled:transform-none flex items-center justify-center gap-2"
-                title="Re-clasificar TODOS los productos automáticamente con Gemini Pro"
+                title="Re-clasificar TODOS los productos automáticamente usando Groq"
               >
                 {isClassifying ? (
                   <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div> {classifyProgress}</>
                 ) : (
-                  <>✨ Ordenar Todo con IA (Pro)</>
+                  <>⚡ Ordenar Todo con IA (Groq)</>
                 )}
               </button>
 
