@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 
 export async function POST() {
   try {
-    // 1. Traemos TODOS los productos de Supabase sin importar su categoría actual
+    // 1. Traemos TODOS los productos de Supabase
     const { data: productos, error: dbError } = await supabase.from('productos').select('id, name, description, category');
     
     if (dbError) throw dbError;
@@ -12,24 +12,28 @@ export async function POST() {
       return NextResponse.json({ message: "No hay productos en la base de datos para clasificar." });
     }
 
-    // 2. Preparamos la orden para la IA exigiéndole que re-evalúe todo
+    // 2. NUEVO PROMPT: Libertad para crear categorías
     const prompt = `
-      Eres un experto en e-commerce. Tu tarea es analizar TODOS los siguientes productos y reasignarles la categoría más adecuada, ignorando cualquier categoría que tengan actualmente. 
-      Debes usar ÚNICAMENTE UNA de estas 5 categorías exactas para cada producto:
+      Eres un experto en e-commerce y organización de inventarios. Tu tarea es analizar TODOS los siguientes productos y asignarles la categoría más adecuada, ignorando cualquier categoría que tengan actualmente. 
+      
+      Puedes usar estas categorías principales como inspiración:
       - Tecnología y Gaming
-      - Bazar y Parrilla
+      - Bazar y Hogar
       - Deportes y Tiempo Libre
       - Librería y Estudio
       - Accesorios y Telefonía
 
-      Devuelve UNICAMENTE un JSON válido con el siguiente formato, sin texto adicional ni formato markdown:
+      REGLA VITAL: Si encuentras productos que claramente NO encajan en estas opciones (por ejemplo, juguetes, ropa, herramientas, repuestos, etc.), TIENES TOTAL PERMISO para crear y asignar NUEVAS categorías. Que sean nombres cortos, profesionales y descriptivos (Ej: "Juguetería", "Indumentaria", "Ferretería"). 
+      Trata de agrupar inteligentemente para no crear 50 categorías distintas.
+
+      Devuelve UNICAMENTE un arreglo JSON válido con el siguiente formato EXACTO, sin texto adicional, sin saludos y sin formato markdown:
       [{"id": "id_del_producto", "category": "Categoria Asignada"}]
 
       Productos a clasificar:
       ${JSON.stringify(productos.map(p => ({id: p.id, name: p.name, description: p.description})))}
     `;
 
-    // 3. Llamamos a la API gratuita de Gemini
+    // 3. Llamamos a Gemini
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -42,20 +46,25 @@ export async function POST() {
     const result = await response.json();
     
     if (result.error) {
+      console.error("Error devuelto por Gemini:", result.error);
       throw new Error(result.error.message);
     }
 
-    const text = result.candidates[0].content.parts[0].text;
+    let text = result.candidates[0].content.parts[0].text;
+    
+    // 4. FILTRO ANTI-ERRORES: Limpiamos el texto por si Gemini mandó comillas de código (Markdown)
+    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    
     const clasificaciones = JSON.parse(text);
 
-    // 4. Actualizamos Supabase con las NUEVAS decisiones de la IA
+    // 5. Actualizamos Supabase
     for (const item of clasificaciones) {
       await supabase.from('productos').update({ category: item.category }).eq('id', item.id);
     }
 
-    return NextResponse.json({ message: `¡Éxito total! La IA analizó y reordenó ${clasificaciones.length} productos en sus categorías ideales.` });
+    return NextResponse.json({ message: `¡Éxito total! La IA analizó y reordenó ${clasificaciones.length} productos, adaptando las categorías automáticamente.` });
   } catch (error) {
     console.error("Error en clasificación IA:", error);
-    return NextResponse.json({ error: "Fallo la conexión con la IA. Verifica tu API Key o intentá de nuevo." }, { status: 500 });
+    return NextResponse.json({ error: "Fallo la conexión con la IA o el formato devuelto. Verifica tu API Key o intentá de nuevo." }, { status: 500 });
   }
 }
