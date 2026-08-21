@@ -95,13 +95,13 @@ export default function AdminDashboard() {
     }
   };
 
-  // FUNCIÓN ULTRA-RESILIENTE PARA CLASIFICAR
+  // FUNCIÓN ULTRA-RESILIENTE PARA CLASIFICAR CON PAUSA LARGA
   const handleClassifyAI = async () => {
-    if (!window.confirm("¿Reordenar TODO el catálogo? Este proceso tomará un momento.")) return;
+    if (!window.confirm("¿Reordenar TODO el catálogo? Este proceso tomará un par de minutos para respetar los límites de seguridad de Google Gemini.")) return;
     
     setIsClassifying(true);
     try {
-      const batchSize = 10; // REDUCIDO A 10 para evitar timeout de Vercel (10 segundos)
+      const batchSize = 10; 
       const totalBatches = Math.ceil(adminProducts.length / batchSize);
       let procesados = 0;
       let errores = 0;
@@ -120,7 +120,7 @@ export default function AdminDashboard() {
           });
           
           const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Error en la respuesta');
+          if (!res.ok) throw new Error(data.error || 'Error desconocido del servidor');
           
           procesados += data.count || lote.length;
         } catch (batchError) {
@@ -128,13 +128,15 @@ export default function AdminDashboard() {
           errores++;
         }
 
-        // PAUSA DE 1.5 SEGUNDOS para no bloquear la API gratuita de Gemini
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // PAUSA DE 5 SEGUNDOS: Clave para evadir el "Rate Limit" (429) de Gemini
+        if (numeroLote < totalBatches) {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
       }
       
       let mensajeFinal = `¡Proceso terminado! Se ordenaron ${procesados} productos con éxito.`;
       if (errores > 0) {
-        mensajeFinal += `\nHubo problemas con ${errores} lote(s). Podes volver a presionar el botón luego para completar lo faltante.`;
+        mensajeFinal += `\nHubo problemas con ${errores} lote(s). Podés volver a presionar el botón luego para completar lo faltante.`;
       }
       
       alert(mensajeFinal);
@@ -319,12 +321,12 @@ export default function AdminDashboard() {
                 onClick={handleClassifyAI} 
                 disabled={isClassifying}
                 className="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 disabled:transform-none flex items-center justify-center gap-2"
-                title="Re-clasificar TODOS los productos automáticamente"
+                title="Re-clasificar TODOS los productos automáticamente con Gemini Pro"
               >
                 {isClassifying ? (
                   <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div> {classifyProgress}</>
                 ) : (
-                  <>✨ Ordenar Todo con IA</>
+                  <>✨ Ordenar Todo con IA (Pro)</>
                 )}
               </button>
 
@@ -486,6 +488,14 @@ export default function AdminDashboard() {
                       {order.status === 'pendiente' && <span className="bg-yellow-900/50 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold uppercase border border-yellow-800/50">Pendiente</span>}
                       {order.status === 'pagado' && <span className="bg-green-900/50 text-green-400 px-3 py-1 rounded-full text-xs font-bold uppercase border border-green-800/50">Pagado</span>}
                       {order.status === 'enviado' && <span className="bg-blue-900/50 text-blue-400 px-3 py-1 rounded-full text-xs font-bold uppercase border border-blue-800/50">Enviado</span>}
+                    </div>
+                  </div>
+                  <div className="p-5 border-b border-gray-700 bg-gray-800/50">
+                    <h4 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2"><span>👤</span> Datos del comprador</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div><p className="text-gray-500 text-xs">Email</p><p className="font-bold text-gray-200 truncate">{order.user_email || 'Sin registro'}</p></div>
+                      <div><p className="text-gray-500 text-xs">Nombre</p><p className="font-bold text-gray-200 truncate">{order.user_name || 'No cargado'}</p></div>
+                      <div className="col-span-2"><p className="text-gray-500 text-xs">Teléfono / WhatsApp</p><p className="font-bold text-gray-200">{order.user_phone || 'No cargado'}</p></div>
                     </div>
                   </div>
                   <div className="p-5 flex-grow">
