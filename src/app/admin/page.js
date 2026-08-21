@@ -31,7 +31,6 @@ export default function AdminDashboard() {
     name: '', price: '', category: '', image: '', description: ''
   });
   
-  // Estados de guardado e IA Individual
   const [savingProduct, setSavingProduct] = useState(false);
   const [isAutoClassifying, setIsAutoClassifying] = useState(false); 
   
@@ -158,7 +157,6 @@ ${JSON.stringify(productsToClassify)}`;
     alert("¡Comando copiado! Pegalo en ChatGPT o Gemini.");
   };
 
-  // --- FUNCIONES DE PRODUCTOS ---
   const openProductModal = (product = null) => {
     if (product) {
       setEditingProduct(product);
@@ -172,7 +170,7 @@ ${JSON.stringify(productsToClassify)}`;
     setIsProductModalOpen(true);
   };
 
-  // FUNCIÓN GUARDAR PRODUCTO: Conexión segura al Backend para 1 solo producto
+  // FUNCIÓN GUARDAR PRODUCTO: Con detección de errores visibles
   const saveProduct = async (e) => {
     e.preventDefault();
     setSavingProduct(true);
@@ -180,7 +178,6 @@ ${JSON.stringify(productsToClassify)}`;
     try {
       let finalCategory = productForm.category;
 
-      // Magia IA Individual: Consultamos a nuestro micro-backend
       if (!finalCategory || finalCategory.trim() === '') {
         setIsAutoClassifying(true);
         try {
@@ -190,14 +187,17 @@ ${JSON.stringify(productsToClassify)}`;
             body: JSON.stringify({ name: productForm.name, description: productForm.description })
           });
           
-          if (res.ok) {
-            const data = await res.json();
+          const data = await res.json();
+          
+          if (res.ok && data.category) {
             finalCategory = data.category; 
           } else {
+            // AHORA SÍ TE VA A DECIR QUÉ ESTÁ FALLANDO
+            alert(`⚠️ Error de IA: ${data.error}. Se guardará como 'Sin Clasificar'.`);
             finalCategory = "Sin Clasificar";
           }
         } catch (iaError) {
-          console.error("Error contactando al servidor:", iaError);
+          alert(`⚠️ Falla de conexión con servidor: ${iaError.message}. Se guardará como 'Sin Clasificar'.`);
           finalCategory = "Sin Clasificar";
         } finally {
           setIsAutoClassifying(false);
@@ -357,10 +357,9 @@ ${JSON.stringify(productsToClassify)}`;
 
               <button 
                 onClick={openAIModal}
-                className="w-full sm:w-auto bg-[#FF9980]/20 hover:bg-[#FF9980]/30 text-[#FF9980] border border-[#FF9980]/50 font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2"
-                title="Herramienta a prueba de fallos para ordenar el catálogo usando ChatGPT"
+                className="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 text-white font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2"
               >
-                🧠 Reordenar Catálogo
+                🧠 Ordenar con IA (Modo Seguro)
               </button>
 
               <button onClick={() => openProductModal()} className="w-full sm:w-auto bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-6 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2">
