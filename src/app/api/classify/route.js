@@ -21,8 +21,8 @@ export async function POST(req) {
       ${JSON.stringify(lote.map(p => ({id: p.id, name: p.name, description: p.description})))}
     `;
 
-    // ACTUALIZADO: Apuntando directamente al modelo gemini-1.5-pro
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+    // VOLVEMOS AL MODELO FLASH: 100% gratuito, veloz y sin bloqueos de facturación
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -33,8 +33,8 @@ export async function POST(req) {
 
     if (!response.ok) {
       const errData = await response.text();
-      console.error("Error desde Gemini:", errData);
-      throw new Error(`La API de Gemini rechazó la conexión (Status: ${response.status}). Posible límite de peticiones.`);
+      console.error("ERROR CRÍTICO DE GOOGLE:", errData);
+      throw new Error(`Google rechazó la API Key o el modelo (Status: ${response.status}).`);
     }
 
     const result = await response.json();
@@ -52,7 +52,6 @@ export async function POST(req) {
 
     const clasificaciones = JSON.parse(jsonMatch[0]);
 
-    // OPTIMIZACIÓN: Guardar todo en Supabase al mismo tiempo (Paralelismo) para ser más rápidos que Vercel
     await Promise.all(clasificaciones.map(item => {
       if(item.id && item.category) {
         return supabase.from('productos').update({ category: item.category }).eq('id', item.id);
