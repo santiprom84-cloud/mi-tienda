@@ -20,7 +20,7 @@ export default function AdminDashboard() {
 
   // ESTADOS DE LA IA
   const [isClassifying, setIsClassifying] = useState(false);
-  const [classifyProgress, setClassifyProgress] = useState(''); // NUEVO: Para mostrar en qué lote vamos
+  const [classifyProgress, setClassifyProgress] = useState('');
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -95,39 +95,52 @@ export default function AdminDashboard() {
     }
   };
 
-  // NUEVA FUNCIÓN OPTIMIZADA: Clasificación por lotes
+  // FUNCIÓN ULTRA-RESILIENTE PARA CLASIFICAR
   const handleClassifyAI = async () => {
-    if (!window.confirm("¿Estás seguro de reordenar TODO tu catálogo? Esto puede demorar unos minutos ya que se procesará en partes para no saturar el servidor.")) return;
+    if (!window.confirm("¿Reordenar TODO el catálogo? Este proceso tomará un momento.")) return;
     
     setIsClassifying(true);
     try {
-      const batchSize = 30; // 30 productos por llamada a la IA
+      const batchSize = 10; // REDUCIDO A 10 para evitar timeout de Vercel (10 segundos)
       const totalBatches = Math.ceil(adminProducts.length / batchSize);
       let procesados = 0;
+      let errores = 0;
 
-      // Iteramos el catálogo cortándolo en pedacitos
       for (let i = 0; i < adminProducts.length; i += batchSize) {
         const lote = adminProducts.slice(i, i + batchSize);
         const numeroLote = Math.floor(i / batchSize) + 1;
         
         setClassifyProgress(`Lote ${numeroLote} de ${totalBatches}...`);
 
-        const res = await fetch('/api/classify', { 
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lote })
-        });
-        
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Error procesando un lote');
-        
-        procesados += data.count || lote.length;
+        try {
+          const res = await fetch('/api/classify', { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lote })
+          });
+          
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Error en la respuesta');
+          
+          procesados += data.count || lote.length;
+        } catch (batchError) {
+          console.error(`Fallo en el lote ${numeroLote}:`, batchError);
+          errores++;
+        }
+
+        // PAUSA DE 1.5 SEGUNDOS para no bloquear la API gratuita de Gemini
+        await new Promise(resolve => setTimeout(resolve, 1500));
       }
       
-      alert(`¡Éxito total! La IA ordenó exitosamente ${procesados} productos.`);
+      let mensajeFinal = `¡Proceso terminado! Se ordenaron ${procesados} productos con éxito.`;
+      if (errores > 0) {
+        mensajeFinal += `\nHubo problemas con ${errores} lote(s). Podes volver a presionar el botón luego para completar lo faltante.`;
+      }
+      
+      alert(mensajeFinal);
       fetchAdminData(); 
     } catch (error) {
-      alert(`Error al clasificar: ${error.message}`);
+      alert(`Error general del sistema: ${error.message}`);
     } finally {
       setIsClassifying(false);
       setClassifyProgress('');
@@ -309,7 +322,7 @@ export default function AdminDashboard() {
                 title="Re-clasificar TODOS los productos automáticamente"
               >
                 {isClassifying ? (
-                  <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div> {classifyProgress || 'Procesando...'}</>
+                  <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div> {classifyProgress}</>
                 ) : (
                   <>✨ Ordenar Todo con IA</>
                 )}
