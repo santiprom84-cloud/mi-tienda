@@ -18,9 +18,13 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('pedidos'); 
   const [adminProductSearch, setAdminProductSearch] = useState('');
 
-  const [isClassifying, setIsClassifying] = useState(false);
-  const [classifyProgress, setClassifyProgress] = useState('');
+  // ESTADOS DEL MODO SEGURO IA
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [aiPromptText, setAiPromptText] = useState('');
+  const [aiResponseText, setAiResponseText] = useState('');
+  const [isApplyingAI, setIsApplyingAI] = useState(false);
 
+  // Estados del Formulario de Productos
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [productForm, setProductForm] = useState({
@@ -94,68 +98,68 @@ export default function AdminDashboard() {
     }
   };
 
-  // ARQUITECTURA SÁNDWICH: Frontend orquesta, Backend consulta a Groq, Frontend guarda en BD
-  const handleClassifyAI = async () => {
-    if (!window.confirm("¿Listo para el escaneo final? Reordenaremos todo el catálogo de forma segura.")) return;
+  // --- NUEVO SISTEMA IA MODO SEGURO ---
+  const openAIModal = () => {
+    // Generamos el texto perfecto para que copies y pegues en ChatGPT/Gemini
+    const productsToClassify = adminProducts.map(p => ({ id: p.id, name: p.name }));
     
-    setIsClassifying(true);
+    const prompt = `Eres un experto en e-commerce. Analiza estos productos y asígnales una categoría principal.
+Usa estas sugerencias base: "Tecnología y Gaming", "Bazar y Parrilla", "Deportes y Tiempo Libre", "Librería y Estudio", "Accesorios y Telefonía".
+REGLA VITAL: Si el producto no encaja, DEBES CREAR una nueva categoría corta (Ej: "Juguetería", "Niños", "Hogar").
+Devuelve SOLO un JSON válido (sin texto antes ni después) con este formato exacto:
+[
+  {"id": "el_id_aqui", "category": "Categoria Asignada"}
+]
+
+PRODUCTOS:
+${JSON.stringify(productsToClassify)}`;
+
+    setAiPromptText(prompt);
+    setAiResponseText('');
+    setIsAIModalOpen(true);
+  };
+
+  const applyAIResponse = async () => {
+    if (!aiResponseText.trim()) {
+      alert("Pegá el JSON que te dio la IA primero.");
+      return;
+    }
+
+    setIsApplyingAI(true);
     try {
-      const batchSize = 5; // Lotes chiquitos para volar por debajo del radar de timeout
-      const totalBatches = Math.ceil(adminProducts.length / batchSize);
+      // Intentamos limpiar el texto por si copiaste las comillas raras de markdown (```json)
+      let cleanText = aiResponseText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const clasificaciones = JSON.parse(cleanText);
+
+      if (!Array.isArray(clasificaciones)) {
+        throw new Error("El formato no es una lista válida de productos.");
+      }
+
       let procesados = 0;
-      let errores = 0;
-
-      for (let i = 0; i < adminProducts.length; i += batchSize) {
-        const lote = adminProducts.slice(i, i + batchSize);
-        const numeroLote = Math.floor(i / batchSize) + 1;
-        
-        setClassifyProgress(`Lote ${numeroLote} de ${totalBatches}...`);
-
-        try {
-          // 1. Pedimos al backend que haga la llamada a Groq
-          const res = await fetch('/api/classify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lote })
-          });
-          
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Error en la respuesta del servidor');
-
-          // 2. El Frontend, con tu sesión activa, guarda los cambios en Supabase
-          if (data.clasificaciones && Array.isArray(data.clasificaciones)) {
-            for (const item of data.clasificaciones) {
-              if (item.id && item.category) {
-                await supabase.from('productos').update({ category: item.category.trim() }).eq('id', item.id);
-                procesados++;
-              }
-            }
-          }
-        } catch (batchError) {
-          console.error(`Fallo crítico en el lote ${numeroLote}:`, batchError);
-          errores++;
-        }
-
-        // Respirito para la API gratuita
-        if (numeroLote < totalBatches) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+      // Guardamos en Supabase (como somos admin, no nos bloquea)
+      for (const item of clasificaciones) {
+        if (item.id && item.category) {
+          await supabase.from('productos').update({ category: item.category.trim() }).eq('id', item.id);
+          procesados++;
         }
       }
-      
-      let mensajeFinal = `¡Proceso terminado magistralmente! Se ordenaron ${procesados} productos con éxito.`;
-      if (errores > 0) {
-        mensajeFinal += `\nHubo problemas con ${errores} lote(s). Tocá de nuevo el botón para procesar los que quedaron.`;
-      }
-      
-      alert(mensajeFinal);
-      fetchAdminData(); 
+
+      alert(`¡Modo Seguro Exitoso! Se reordenaron ${procesados} productos correctamente.`);
+      setIsAIModalOpen(false);
+      fetchAdminData();
     } catch (error) {
-      alert(`Error general del sistema: ${error.message}`);
+      alert(`Error leyendo el JSON: ${error.message}. Asegurate de copiar solo los corchetes [ ] de la respuesta de la IA.`);
     } finally {
-      setIsClassifying(false);
-      setClassifyProgress('');
+      setIsApplyingAI(false);
     }
   };
+
+  const copyPromptToClipboard = () => {
+    navigator.clipboard.writeText(aiPromptText);
+    alert("¡Comando copiado! Pegalo en ChatGPT, Gemini o Claude.");
+  };
+
+  // --- FIN SISTEMA IA ---
 
   const openProductModal = (product = null) => {
     if (product) {
@@ -313,7 +317,7 @@ export default function AdminDashboard() {
               
               <div className="relative w-full sm:w-64">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                 </div>
                 <input
                   type="text"
@@ -324,22 +328,17 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* BOTÓN MÁGICO FINAL */}
+              {/* BOTÓN MODO SEGURO IA */}
               <button 
-                onClick={handleClassifyAI} 
-                disabled={isClassifying}
-                className="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 disabled:transform-none flex items-center justify-center gap-2"
-                title="Clasificación blindada con Groq"
+                onClick={openAIModal}
+                className="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 text-white font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2"
+                title="Herramienta a prueba de fallos para ordenar el catálogo usando ChatGPT"
               >
-                {isClassifying ? (
-                  <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div> {classifyProgress}</>
-                ) : (
-                  <>⚡ Ordenar Todo con IA (Groq)</>
-                )}
+                🧠 Ordenar con IA (Modo Seguro)
               </button>
 
               <button onClick={() => openProductModal()} className="w-full sm:w-auto bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-6 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 Nuevo Producto
               </button>
             </div>
@@ -364,7 +363,7 @@ export default function AdminDashboard() {
                     filteredAdminProducts.map((p) => (
                       <tr key={p.id} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
                         <td className="px-6 py-3">
-                          <img src={p.image || 'https://via.placeholder.com/50'} alt={p.name} className="w-12 h-12 rounded-lg object-cover border border-gray-600" />
+                          <img src={p.image || '[https://via.placeholder.com/50](https://via.placeholder.com/50)'} alt={p.name} className="w-12 h-12 rounded-lg object-cover border border-gray-600" />
                         </td>
                         <td className="px-6 py-3 font-bold text-gray-100 max-w-[200px] truncate" title={p.name}>{p.name}</td>
                         <td className="px-6 py-3">
@@ -387,7 +386,74 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* ========================================== */}
+      {/* MODAL: IA MODO SEGURO */}
+      {/* ========================================== */}
+      {isAIModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsAIModalOpen(false)}></div>
+          <div className="relative bg-gray-800 w-full max-w-4xl rounded-3xl border border-gray-700 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            
+            <div className="bg-gray-900 p-6 border-b border-gray-700 flex justify-between items-center shrink-0">
+              <h3 className="text-xl font-black text-white flex items-center gap-2">
+                <span>🧠</span> Asistente IA (Modo Infalible)
+              </h3>
+              <button onClick={() => setIsAIModalOpen(false)} className="text-gray-400 hover:text-white bg-gray-800 hover:bg-red-500/20 p-2 rounded-lg transition-colors">
+                <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto custom-scrollbar flex-grow grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* PASO 1 */}
+              <div className="flex flex-col gap-3">
+                <div className="bg-purple-900/30 border border-purple-800/50 p-4 rounded-xl">
+                  <h4 className="text-purple-400 font-black text-sm uppercase mb-1">Paso 1: Copiar Comando</h4>
+                  <p className="text-gray-300 text-xs mb-3">
+                    Este cuadro tiene tu catálogo listo. Copiá todo el texto y pegalo en <a href="[https://chatgpt.com/](https://chatgpt.com/)" target="_blank" rel="noreferrer" className="text-[#FF9980] underline">ChatGPT</a> o <a href="[https://gemini.google.com/](https://gemini.google.com/)" target="_blank" rel="noreferrer" className="text-[#FF9980] underline">Gemini</a>.
+                  </p>
+                  <button onClick={copyPromptToClipboard} className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded-lg text-sm transition-colors mb-3">
+                    📋 Copiar Comando Completo
+                  </button>
+                  <textarea 
+                    readOnly 
+                    value={aiPromptText} 
+                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-gray-400 text-xs font-mono h-64 resize-none custom-scrollbar"
+                  />
+                </div>
+              </div>
+
+              {/* PASO 2 */}
+              <div className="flex flex-col gap-3">
+                <div className="bg-green-900/30 border border-green-800/50 p-4 rounded-xl flex flex-col h-full">
+                  <h4 className="text-green-400 font-black text-sm uppercase mb-1">Paso 2: Pegar Resultado</h4>
+                  <p className="text-gray-300 text-xs mb-3">
+                    Copiá el texto tipo JSON que te responda la IA y pegalo en este cuadro.
+                  </p>
+                  <textarea 
+                    value={aiResponseText} 
+                    onChange={(e) => setAiResponseText(e.target.value)}
+                    placeholder='Pegá acá la respuesta que empieza con ['
+                    className="w-full flex-grow bg-gray-900 border border-green-800/50 rounded-lg p-3 text-green-400 text-xs font-mono h-64 resize-none focus:outline-none focus:border-green-500 mb-3 custom-scrollbar"
+                  />
+                  <button 
+                    onClick={applyAIResponse} 
+                    disabled={isApplyingAI || !aiResponseText}
+                    className="w-full bg-green-600 hover:bg-green-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-black py-3 rounded-lg text-sm transition-transform transform hover:-translate-y-1 disabled:transform-none flex items-center justify-center gap-2"
+                  >
+                    {isApplyingAI ? 'Guardando cambios...' : '✨ Aplicar Categorías'}
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================== */}
       {/* MODAL: CREAR / EDITAR PRODUCTO */}
+      {/* ========================================== */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsProductModalOpen(false)}></div>
@@ -399,7 +465,7 @@ export default function AdminDashboard() {
                 {editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}
               </h3>
               <button onClick={() => setIsProductModalOpen(false)} className="text-gray-400 hover:text-white bg-gray-800 hover:bg-red-500/20 p-2 rounded-lg transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
               </button>
             </div>
 
