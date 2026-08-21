@@ -17,8 +17,11 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pedidos'); 
 
-  // NUEVO: Estado para el buscador de productos del Admin
+  // Buscador de productos del Admin
   const [adminProductSearch, setAdminProductSearch] = useState('');
+
+  // NUEVO: Estado para el botón de la IA
+  const [isClassifying, setIsClassifying] = useState(false);
 
   // Estados del Formulario de Productos
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -96,6 +99,26 @@ export default function AdminDashboard() {
     }
   };
 
+  // NUEVA FUNCIÓN: Disparar la clasificación de la IA
+  const handleClassifyAI = async () => {
+    if (!window.confirm("¿Querés que la IA analice y asigne categorías automáticamente a los productos que no tienen una?")) return;
+    
+    setIsClassifying(true);
+    try {
+      const res = await fetch('/api/classify', { method: 'POST' });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || 'Error en el servidor');
+      
+      alert(data.message);
+      fetchAdminData(); // Recargamos la tabla para ver los cambios
+    } catch (error) {
+      alert(`Error al clasificar: ${error.message}`);
+    } finally {
+      setIsClassifying(false);
+    }
+  };
+
   const openProductModal = (product = null) => {
     if (product) {
       setEditingProduct(product);
@@ -155,13 +178,8 @@ export default function AdminDashboard() {
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('productos')
-        .upload(fileName, file);
-
+      const { error: uploadError } = await supabase.storage.from('productos').upload(fileName, file);
       if (uploadError) throw uploadError;
-
       const { data } = supabase.storage.from('productos').getPublicUrl(fileName);
       setProductForm(prev => ({ ...prev, image: data.publicUrl }));
     } catch (error) {
@@ -192,7 +210,6 @@ export default function AdminDashboard() {
     });
   };
 
-  // Filtrar productos del admin según el buscador
   const filteredAdminProducts = adminProducts.filter(p => 
     p.name.toLowerCase().includes(adminProductSearch.toLowerCase()) || 
     (p.category && p.category.toLowerCase().includes(adminProductSearch.toLowerCase()))
@@ -248,14 +265,15 @@ export default function AdminDashboard() {
 
       {activeTab === 'productos' && (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-lg gap-4">
+          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-lg gap-4">
             <div>
               <h2 className="text-xl font-black text-white">Inventario</h2>
               <p className="text-gray-400 text-sm">Gestioná los {adminProducts.length} productos de tu tienda.</p>
             </div>
             
-            {/* NUEVA BARRA DE BÚSQUEDA Y BOTÓN JUNTOS */}
-            <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-4">
+            {/* ZONA DE BOTONES Y BUSCADOR */}
+            <div className="flex flex-col sm:flex-row w-full xl:w-auto gap-3">
+              
               <div className="relative w-full sm:w-64">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -268,6 +286,20 @@ export default function AdminDashboard() {
                   className="w-full bg-gray-900 border border-gray-600 rounded-xl pl-10 pr-4 py-2.5 sm:py-3 text-sm text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors shadow-inner"
                 />
               </div>
+
+              {/* BOTÓN MÁGICO DE IA */}
+              <button 
+                onClick={handleClassifyAI} 
+                disabled={isClassifying}
+                className="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 disabled:transform-none flex items-center justify-center gap-2"
+                title="Clasificar productos sin categoría automáticamente"
+              >
+                {isClassifying ? (
+                  <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div> Procesando...</>
+                ) : (
+                  <>✨ Ordenar con IA (Gratis)</>
+                )}
+              </button>
 
               <button onClick={() => openProductModal()} className="w-full sm:w-auto bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-6 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -290,7 +322,7 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody>
                   {filteredAdminProducts.length === 0 ? (
-                    <tr><td colSpan="5" className="text-center py-10 text-gray-500">No se encontraron productos con esa búsqueda.</td></tr>
+                    <tr><td colSpan="5" className="text-center py-10 text-gray-500">No se encontraron productos.</td></tr>
                   ) : (
                     filteredAdminProducts.map((p) => (
                       <tr key={p.id} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
@@ -299,7 +331,9 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-6 py-3 font-bold text-gray-100 max-w-[200px] truncate" title={p.name}>{p.name}</td>
                         <td className="px-6 py-3">
-                          <span className="bg-gray-900 border border-gray-600 px-2 py-1 rounded-md text-xs">{p.category || '-'}</span>
+                          <span className={`border px-2 py-1 rounded-md text-xs font-bold ${!p.category || p.category === 'Todas' ? 'bg-red-900/50 border-red-800 text-red-400' : 'bg-gray-900 border-gray-600'}`}>
+                            {p.category || 'SIN CLASIFICAR'}
+                          </span>
                         </td>
                         <td className="px-6 py-3 font-black text-[#FF9980]">${Number(p.price).toLocaleString('es-AR')}</td>
                         <td className="px-6 py-3 text-right space-x-2">
@@ -316,9 +350,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ========================================== */}
-      {/* MODAL: CREAR / EDITAR PRODUCTO CON DRAG & DROP */}
-      {/* ========================================== */}
+      {/* MODAL: CREAR / EDITAR PRODUCTO */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsProductModalOpen(false)}></div>
@@ -347,13 +379,7 @@ export default function AdminDashboard() {
                       isDragging ? 'border-[#FF9980] bg-[#FF9980]/10 scale-[1.02]' : 'border-gray-600 bg-gray-900 hover:border-gray-500 hover:bg-gray-800'
                     }`}
                   >
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={onFileInput} 
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                      title="Arrastrá o hacé clic"
-                    />
+                    <input type="file" accept="image/*" onChange={onFileInput} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" title="Arrastrá o hacé clic"/>
                     
                     {uploadingImage ? (
                       <div className="flex flex-col items-center gap-3 py-4">
@@ -405,9 +431,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="bg-gray-900 p-6 border-t border-gray-700 flex justify-end gap-3 shrink-0">
-              <button type="button" onClick={() => setIsProductModalOpen(false)} className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
-                Cancelar
-              </button>
+              <button type="button" onClick={() => setIsProductModalOpen(false)} className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">Cancelar</button>
               <button type="submit" form="productForm" disabled={savingProduct || uploadingImage} className="bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-8 py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none flex items-center gap-2">
                 {savingProduct ? 'Guardando...' : 'Guardar Producto'}
               </button>
@@ -437,16 +461,7 @@ export default function AdminDashboard() {
                       {order.status === 'enviado' && <span className="bg-blue-900/50 text-blue-400 px-3 py-1 rounded-full text-xs font-bold uppercase border border-blue-800/50">Enviado</span>}
                     </div>
                   </div>
-                  <div className="p-5 border-b border-gray-700 bg-gray-800/50">
-                    <h4 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2"><span>👤</span> Datos del comprador</h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div><p className="text-gray-500 text-xs">Email</p><p className="font-bold text-gray-200 truncate">{order.user_email || 'Sin registro'}</p></div>
-                      <div><p className="text-gray-500 text-xs">Nombre</p><p className="font-bold text-gray-200 truncate">{order.user_name || 'No cargado'}</p></div>
-                      <div className="col-span-2"><p className="text-gray-500 text-xs">Teléfono / WhatsApp</p><p className="font-bold text-gray-200">{order.user_phone || 'No cargado'}</p></div>
-                    </div>
-                  </div>
                   <div className="p-5 flex-grow">
-                    <h4 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">Productos:</h4>
                     <ul className="space-y-3">
                       {order.items.map((item, index) => (
                         <li key={index} className="flex justify-between items-center text-sm">
@@ -465,9 +480,8 @@ export default function AdminDashboard() {
                       <span className="text-2xl font-black text-[#FF9980]">${Number(order.total).toLocaleString('es-AR')}</span>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button onClick={() => updateOrderStatus(order.id, 'pagado')} disabled={order.status === 'pagado'} className="flex-1 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs font-bold py-3 rounded-lg transition-colors">Marcar Pagado</button>
-                      <button onClick={() => updateOrderStatus(order.id, 'enviado')} disabled={order.status === 'enviado'} className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs font-bold py-3 rounded-lg transition-colors">Marcar Enviado</button>
-                      <button onClick={() => deleteOrder(order.id)} className="w-full mt-1 border border-red-900/50 text-red-400 hover:bg-red-900/20 text-xs font-bold py-3 rounded-lg transition-colors flex justify-center gap-2">Rechazar y Borrar Pedido</button>
+                      <button onClick={() => updateOrderStatus(order.id, 'pagado')} disabled={order.status === 'pagado'} className="flex-1 bg-green-600 hover:bg-green-500 text-white text-xs font-bold py-3 rounded-lg">Marcar Pagado</button>
+                      <button onClick={() => updateOrderStatus(order.id, 'enviado')} disabled={order.status === 'enviado'} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-3 rounded-lg">Marcar Enviado</button>
                     </div>
                   </div>
                 </div>
@@ -486,19 +500,17 @@ export default function AdminDashboard() {
                 <tr>
                   <th className="px-6 py-4 font-black">Email</th>
                   <th className="px-6 py-4 font-black">Nombre (Perfil)</th>
-                  <th className="px-6 py-4 font-black">Ciudad</th>
                   <th className="px-6 py-4 font-black">Fecha de Registro</th>
                 </tr>
               </thead>
               <tbody>
                 {registeredUsers.length === 0 ? (
-                  <tr><td colSpan="4" className="text-center py-10 text-gray-500">Ningún usuario registrado.</td></tr>
+                  <tr><td colSpan="3" className="text-center py-10 text-gray-500">Ningún usuario registrado.</td></tr>
                 ) : (
                   registeredUsers.map((u) => (
-                    <tr key={u.id} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
+                    <tr key={u.id} className="border-b border-gray-700/50">
                       <td className="px-6 py-4 font-bold text-gray-100">{u.email}</td>
-                      <td className="px-6 py-4">{u.full_name || <span className="text-gray-600 italic">No cargado</span>}</td>
-                      <td className="px-6 py-4">{u.city || '-'}</td>
+                      <td className="px-6 py-4">{u.full_name || '-'}</td>
                       <td className="px-6 py-4 font-mono text-xs">{formatDate(u.created_at)}</td>
                     </tr>
                   ))
@@ -527,14 +539,9 @@ export default function AdminDashboard() {
           ) : (
             <div className="flex flex-col gap-3">
               {activeUsers.map((activeUser, index) => (
-                <div key={index} className="bg-gray-800 border border-green-500/30 p-4 rounded-xl flex items-center justify-between shadow-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]"></div>
-                    <span className="font-bold text-gray-200">{activeUser.email}</span>
-                  </div>
-                  <span className="text-xs text-gray-500 font-mono">
-                    Activo desde: {new Date(activeUser.online_at).toLocaleTimeString('es-AR')}
-                  </span>
+                <div key={index} className="bg-gray-800 border border-green-500/30 p-4 rounded-xl flex items-center gap-3">
+                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]"></div>
+                  <span className="font-bold text-gray-200">{activeUser.email}</span>
                 </div>
               ))}
             </div>
@@ -546,7 +553,6 @@ export default function AdminDashboard() {
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
       `}</style>
-
     </div>
   );
 }
