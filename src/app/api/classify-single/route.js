@@ -15,32 +15,47 @@ export async function POST(req) {
     const prompt = `
       Eres un experto en e-commerce. Asigna UNA categoría corta a este producto.
       Sugerencias: "Tecnología y Gaming", "Bazar y Hogar", "Deportes y Tiempo Libre", "Librería y Estudio", "Accesorios", "Indumentaria", "Juguetería", "Ferretería".
-      Devuelve SOLO un JSON con este formato exacto: {"category": "NombreDeCategoria"}
-      
+      Devuelve SOLO un JSON válido con este formato exacto: {"category": "NombreDeCategoria"}
+      No incluyas texto antes ni después.
+
       Producto: ${name}
       Descripción: ${description || 'Sin descripción'}
     `;
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+    const requestBody = JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1 } 
+    });
+
+    // PLAN A: Intentamos con la versión más reciente del modelo Flash
+    let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { 
-          temperature: 0.1,
-          response_mime_type: "application/json" // Obligamos a que devuelva JSON puro
-        }
-      })
+      body: requestBody
     });
+
+    // PLAN B: Si Google tira 404 (el error de tu video), pasamos al modelo Pro universal
+    if (response.status === 404) {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody
+      });
+    }
 
     if (!response.ok) {
       const errData = await response.text();
-      throw new Error(`Google API rechazó la conexión: Status ${response.status}. Detalle: ${errData}`);
+      throw new Error(`Google API falló: ${errData}`);
     }
 
     const data = await response.json();
-    const text = data.candidates[0].content.parts[0].text;
-    const parsed = JSON.parse(text);
+    let text = data.candidates[0].content.parts[0].text;
+    
+    // Limpieza extrema de JSON por si la IA agrega código Markdown
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("La IA no devolvió un JSON.");
+
+    const parsed = JSON.parse(jsonMatch[0]);
 
     return NextResponse.json({ category: parsed.category });
   } catch (error) {
