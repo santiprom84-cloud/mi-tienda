@@ -1,67 +1,73 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-// Asumiendo que tenes un contexto de carrito. Si usas otro nombre, cambialo acá.
-import { useCart } from '@/context/CartContext'; 
+import { useCart } from '@/context/CartContext';
 
-export default function CheckoutPage() {
-  const { cart, cartTotal, clearCart } = useCart();
+export default function DynamicCheckoutPage({ params }) {
+  const { id } = params;
   const router = useRouter();
+  const { clearCart } = useCart();
+
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
-    name: '', email: '', phone: '', address: ''
+    name: '', email: '', phone: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [orderId, setOrderId] = useState('');
 
   // ⚠️ PONÉ TU NÚMERO DE WHATSAPP ACÁ (Código de área de Córdoba 351)
   const NUMERO_WHATSAPP = "5493510000000"; 
 
+  // Esta función "atrapa" el ID de la URL y busca el pedido en Supabase
+  useEffect(() => {
+    const fetchOrder = async () => {
+      try {
+        const { data, error } = await supabase.from('pedidos').select('*').eq('id', id).single();
+        if (error || !data) {
+          alert("No se encontró el pedido o expiró.");
+          router.push('/');
+          return;
+        }
+        setOrder(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (id) fetchOrder();
+  }, [id, router]);
+
+  // Esta función actualiza el pedido en la base de datos con los datos del cliente
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (cart.length === 0) {
-      alert("Tu carrito está vacío.");
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      // Formateamos el pedido para Supabase
-      const newOrder = {
-        user_email: formData.email,
+      const { error } = await supabase.from('pedidos').update({
         user_name: formData.name,
+        user_email: formData.email,
         user_phone: formData.phone,
-        total: cartTotal,
-        status: 'pendiente',
-        items: cart.map(item => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity
-        }))
-      };
+      }).eq('id', id);
 
-      const { data, error } = await supabase.from('pedidos').insert([newOrder]).select().single();
-      
       if (error) throw error;
-
-      setOrderId(data.id);
+      
+      clearCart(); // Vaciamos el carrito porque ya cargó sus datos
       setIsSuccess(true);
-      clearCart(); 
     } catch (error) {
-      alert(`Error al generar pedido: ${error.message}`);
+      alert(`Error al guardar tus datos: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   // --- PANTALLA DE ÉXITO: Flujo de confirmación por WhatsApp ---
-  if (isSuccess) {
-    const shortOrderId = orderId.split('-')[0].toUpperCase();
-    const whatsappMessage = encodeURIComponent(`¡Hola! Acabo de realizar el pedido #${shortOrderId} en Polirubro Online por un total de $${cartTotal.toLocaleString('es-AR')}.\n\nQuiero confirmar el stock de mis productos y coordinar el tema del envío. ¡Aguardo tu confirmación para poder realizar el pago!`);
+  if (isSuccess && order) {
+    const shortOrderId = order.id.split('-')[0].toUpperCase();
+    const whatsappMessage = encodeURIComponent(`¡Hola! Acabo de registrar mis datos para el pedido #${shortOrderId} en Polirubro Online por un total de $${order.total.toLocaleString('es-AR')}.\n\nQuiero confirmar el stock de los productos y coordinar el envío. ¡Aguardo tu confirmación!`);
     const whatsappLink = `https://wa.me/${5493518089416}?text=${whatsappMessage}`;
 
     return (
@@ -82,7 +88,7 @@ export default function CheckoutPage() {
               Confirmación Obligatoria
             </h2>
             <p className="text-gray-400 text-sm mb-4">
-              Para garantizar que recibas todo perfecto, necesitamos confirmar el stock de tus productos y calcular el costo de envío (si aplica).
+              Para garantizar que recibas todo perfecto, necesitamos confirmar el stock y calcular el costo de envío.
             </p>
             
             <a 
@@ -102,51 +108,54 @@ export default function CheckoutPage() {
               Pago y Envío
             </h2>
             <p className="text-gray-500 text-sm">
-              Una vez que nos escribas y te confirmemos todo por WhatsApp, ahí mismo te pasaremos nuestro <strong>Alias bancario</strong> para realizar la transferencia y coordinaremos la entrega.
+              Una vez que nos escribas y te confirmemos todo, te pasaremos nuestro Alias para transferir y coordinaremos la entrega.
             </p>
           </div>
-
-          <button onClick={() => router.push('/')} className="mt-8 text-gray-400 hover:text-white font-bold text-sm transition-colors underline">
-            Volver a la tienda
-          </button>
         </div>
       </div>
     );
   }
 
-  // --- PANTALLA DE FORMULARIO DE CHECKOUT NORMAL ---
+  if (loading || !order) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-[#FF9980]"></div>
+        <p className="text-[#FF9980] font-bold mt-4 animate-pulse">Cargando tu pedido...</p>
+      </div>
+    );
+  }
+
+  // --- PANTALLA DE FORMULARIO DE DATOS ---
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-8 mt-10 mb-20 animate-fade-in">
       <h1 className="text-3xl font-black text-white mb-8 border-b border-gray-800 pb-4">Finalizar Compra</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
         
-        {/* RESUMEN DEL CARRITO */}
-        <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 h-fit">
-          <h2 className="text-[#FF9980] font-black uppercase tracking-widest text-sm mb-6">Tu Pedido</h2>
-          {cart.length === 0 ? (
-            <p className="text-gray-500">No hay productos.</p>
-          ) : (
-            <ul className="space-y-4 mb-6">
-              {cart.map(item => (
-                <li key={item.id} className="flex justify-between items-center text-sm">
-                  <div className="flex items-center gap-3">
-                    <span className="bg-gray-800 text-gray-300 px-2 py-1 rounded-md font-bold text-xs">{item.quantity}x</span>
-                    <span className="text-gray-200 line-clamp-1">{item.name}</span>
-                  </div>
-                  <span className="font-mono text-gray-400">${(item.price * item.quantity).toLocaleString('es-AR')}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+        {/* RESUMEN DEL PEDIDO OBTENIDO DE LA BASE DE DATOS */}
+        <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 h-fit shadow-xl">
+          <h2 className="text-[#FF9980] font-black uppercase tracking-widest text-sm mb-6">Tu Pedido #{order.id.split('-')[0].toUpperCase()}</h2>
+          
+          <ul className="space-y-4 mb-6 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+            {order.items && order.items.map((item, index) => (
+              <li key={index} className="flex justify-between items-center text-sm">
+                <div className="flex items-center gap-3">
+                  <span className="bg-gray-800 text-gray-300 px-2 py-1 rounded-md font-bold text-xs">{item.quantity}x</span>
+                  <span className="text-gray-200 line-clamp-1">{item.name}</span>
+                </div>
+                <span className="font-mono text-gray-400">${(item.price * item.quantity).toLocaleString('es-AR')}</span>
+              </li>
+            ))}
+          </ul>
+          
           <div className="border-t border-gray-800 pt-4 flex justify-between items-center">
             <span className="text-white font-bold">Total a pagar</span>
-            <span className="text-2xl font-black text-[#FF9980]">${cartTotal.toLocaleString('es-AR')}</span>
+            <span className="text-2xl font-black text-[#FF9980]">${Number(order.total).toLocaleString('es-AR')}</span>
           </div>
         </div>
 
         {/* FORMULARIO DE DATOS */}
-        <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800">
+        <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 shadow-xl">
           <h2 className="text-[#FF9980] font-black uppercase tracking-widest text-sm mb-6">Tus Datos</h2>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
@@ -161,12 +170,8 @@ export default function CheckoutPage() {
               <label className="block text-gray-400 text-xs font-bold mb-2 uppercase">Teléfono / WhatsApp *</label>
               <input type="tel" required value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:border-[#FF9980]" />
             </div>
-            <div>
-              <label className="block text-gray-400 text-xs font-bold mb-2 uppercase">Dirección de Entrega (Opcional)</label>
-              <input type="text" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="Ej: Av. Colón 1234, Dpto 2B" className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:border-[#FF9980]" />
-            </div>
 
-            <button type="submit" disabled={isSubmitting || cart.length === 0} className="w-full bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black py-4 rounded-xl mt-4 transition-transform transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none">
+            <button type="submit" disabled={isSubmitting} className="w-full bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black py-4 rounded-xl mt-4 transition-transform transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none">
               {isSubmitting ? 'Procesando...' : 'Confirmar Pedido'}
             </button>
           </form>
