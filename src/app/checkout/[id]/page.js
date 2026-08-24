@@ -2,16 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 
-export default function DynamicCheckoutPage({ params }) {
-  const { id } = params;
+export default function DynamicCheckoutPage() {
+  // SOLUCIÓN: useParams() atrapa el ID de la URL de forma 100% segura en Next.js
+  const params = useParams();
+  const id = params?.id; 
+  
   const router = useRouter();
   const { clearCart } = useCart();
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '', email: '', phone: ''
@@ -22,27 +26,34 @@ export default function DynamicCheckoutPage({ params }) {
   // ⚠️ PONÉ TU NÚMERO DE WHATSAPP ACÁ (Código de área de Córdoba 351)
   const NUMERO_WHATSAPP = "5493510000000"; 
 
-  // Esta función "atrapa" el ID de la URL y busca el pedido en Supabase
+  // Esta función busca el pedido en Supabase apenas tenemos el ID
   useEffect(() => {
+    if (!id) return; // Si todavía no leyó la URL, espera sin trabarse.
+
     const fetchOrder = async () => {
       try {
+        setLoading(true);
         const { data, error } = await supabase.from('pedidos').select('*').eq('id', id).single();
+        
         if (error || !data) {
-          alert("No se encontró el pedido o expiró.");
-          router.push('/');
+          console.error("Error buscando el pedido:", error);
+          setFetchError(true);
           return;
         }
+        
         setOrder(data);
       } catch (err) {
-        console.error(err);
+        console.error("Fallo del sistema:", err);
+        setFetchError(true);
       } finally {
         setLoading(false);
       }
     };
-    if (id) fetchOrder();
-  }, [id, router]);
 
-  // Esta función actualiza el pedido en la base de datos con los datos del cliente
+    fetchOrder();
+  }, [id]);
+
+  // Actualiza el pedido en la base de datos con los datos del cliente
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -55,7 +66,7 @@ export default function DynamicCheckoutPage({ params }) {
 
       if (error) throw error;
       
-      clearCart(); // Vaciamos el carrito porque ya cargó sus datos
+      clearCart(); // Vaciamos el carrito
       setIsSuccess(true);
     } catch (error) {
       alert(`Error al guardar tus datos: ${error.message}`);
@@ -64,14 +75,40 @@ export default function DynamicCheckoutPage({ params }) {
     }
   };
 
+  // --- PANTALLA DE CARGA INFINITA CORREGIDA ---
+  if (loading) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center animate-fade-in">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#FF9980]"></div>
+        <p className="text-[#FF9980] font-bold mt-6 animate-pulse text-lg">Cargando tu pedido...</p>
+      </div>
+    );
+  }
+
+  // --- PANTALLA DE ERROR VISUAL (Si falla la base de datos) ---
+  if (fetchError || !order) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-4 animate-fade-in">
+        <div className="max-w-md w-full bg-gray-900 rounded-3xl border border-red-900/50 shadow-2xl p-8 text-center">
+          <span className="text-6xl mb-4 block">⚠️</span>
+          <h2 className="text-2xl font-black text-white mb-2">Pedido no encontrado</h2>
+          <p className="text-gray-400 mb-8">Es posible que el enlace sea incorrecto o el pedido haya expirado por seguridad.</p>
+          <button onClick={() => router.push('/')} className="bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-8 py-3 rounded-xl transition-transform transform hover:-translate-y-1 w-full">
+            Volver a la tienda
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // --- PANTALLA DE ÉXITO: Flujo de confirmación por WhatsApp ---
   if (isSuccess && order) {
     const shortOrderId = order.id.split('-')[0].toUpperCase();
     const whatsappMessage = encodeURIComponent(`¡Hola! Acabo de registrar mis datos para el pedido #${shortOrderId} en Polirubro Online por un total de $${order.total.toLocaleString('es-AR')}.\n\nQuiero confirmar el stock de los productos y coordinar el envío. ¡Aguardo tu confirmación!`);
-    const whatsappLink = `https://wa.me/${5493518089416}?text=${whatsappMessage}`;
+    const whatsappLink = `https://wa.me/${NUMERO_WHATSAPP}?text=${whatsappMessage}`;
 
     return (
-      <div className="min-h-screen bg-[#111111] flex items-center justify-center p-4">
+      <div className="min-h-[80vh] flex items-center justify-center p-4">
         <div className="max-w-xl w-full bg-gray-900 rounded-3xl border border-gray-800 shadow-2xl p-8 text-center animate-fade-in relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#FF9980] to-purple-600"></div>
           
@@ -112,15 +149,6 @@ export default function DynamicCheckoutPage({ params }) {
             </p>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  if (loading || !order) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-[#FF9980]"></div>
-        <p className="text-[#FF9980] font-bold mt-4 animate-pulse">Cargando tu pedido...</p>
       </div>
     );
   }
