@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import ProductCard from '@/components/ProductCard';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
+
+// ATENCIÓN: Eliminamos la importación del Navbar y el Footer porque ya están en layout.js (esto causaba que se vean dobles)
 
 export default function HomePage() {
   const [productos, setProductos] = useState([]);
@@ -13,6 +13,9 @@ export default function HomePage() {
   const [categoriaActiva, setCategoriaActiva] = useState('Todas');
   const [search, setSearch] = useState('');
   const [orden, setOrden] = useState('Novedades');
+  
+  // Nuevo estado para controlar si el menú de tres rayitas está abierto
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
 
   useEffect(() => {
     const fetchProductos = async () => {
@@ -46,7 +49,7 @@ export default function HomePage() {
     productosFiltrados.sort((a, b) => b.price - a.price);
   }
 
-  // Filtrar los destacados (le exigimos que el campo 'featured' sea true)
+  // Filtrar los destacados
   const productosDestacados = productos.filter(p => p.featured === true);
 
   if (loading) {
@@ -59,8 +62,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#0B0D14] flex flex-col font-sans text-gray-100">
-      <Navbar />
-
+      
       <main className="flex-grow max-w-6xl mx-auto w-full p-4 sm:p-6 mt-6">
 
         {/* HERO BANNER ORIGINAL */}
@@ -77,12 +79,44 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* BARRA DE BÚSQUEDA Y FILTROS ORIGINAL */}
-        <div className="bg-[#1A1D24] rounded-2xl p-3 mb-10 shadow-lg">
+        {/* BARRA DE BÚSQUEDA REDISEÑADA (Todo en una sola línea) */}
+        <div className="bg-[#1A1D24] rounded-2xl p-3 mb-10 shadow-lg relative z-40">
           <div className="flex items-center gap-3">
-            <button className="w-12 h-12 shrink-0 bg-[#0B0D14] rounded-xl flex items-center justify-center text-gray-400 hover:text-white transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-            </button>
+            
+            {/* 1. MENÚ DE TRES RAYITAS (CATEGORÍAS) */}
+            <div className="relative">
+              <button 
+                onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
+                className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center transition-colors ${isCategoryMenuOpen ? 'bg-[#FF9980] text-gray-900' : 'bg-[#0B0D14] text-gray-400 hover:text-white'}`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+              </button>
+
+              {/* MENÚ DESPLEGABLE DE CATEGORÍAS */}
+              {isCategoryMenuOpen && (
+                <div className="absolute top-14 left-0 w-56 bg-[#1A1D24] border border-gray-800 rounded-xl shadow-2xl py-2 flex flex-col z-50">
+                  <span className="text-gray-500 text-[10px] font-black uppercase px-4 mb-2">Categorías</span>
+                  {categorias.map(cat => (
+                    <button 
+                      key={cat} 
+                      onClick={() => {
+                        setCategoriaActiva(cat);
+                        setIsCategoryMenuOpen(false);
+                      }}
+                      className={`text-left px-4 py-2.5 text-sm font-bold transition-colors ${
+                        categoriaActiva === cat 
+                        ? 'bg-[#FF9980]/10 text-[#FF9980] border-l-2 border-[#FF9980]' 
+                        : 'text-gray-400 hover:bg-[#0B0D14] hover:text-white border-l-2 border-transparent'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 2. INPUT DE BÚSQUEDA */}
             <div className="relative flex-1">
               <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-gray-500 pointer-events-none">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -95,47 +129,26 @@ export default function HomePage() {
                 className="w-full bg-[#0B0D14] rounded-xl pl-12 pr-4 h-12 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#FF9980] transition-shadow placeholder-gray-600"
               />
             </div>
-          </div>
 
-          <div className="mt-3 bg-[#0B0D14] rounded-xl p-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
-            <div className="flex items-center overflow-x-auto custom-scrollbar pb-1 sm:pb-0">
-              <span className="text-gray-600 text-[10px] sm:text-xs font-black uppercase ml-2 mr-3 shrink-0">Categoría:</span>
-              <div className="flex gap-2">
-                {categorias.map(cat => (
-                  <button 
-                    key={cat} 
-                    onClick={() => setCategoriaActiva(cat)}
-                    className={`whitespace-nowrap px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      categoriaActiva === cat 
-                      ? 'bg-[#2A2D36] text-[#FF9980]' 
-                      : 'text-gray-500 hover:text-gray-300'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
+            {/* 3. SELECTOR DE FILTRO / ORDEN */}
+            <div className="shrink-0 flex items-center h-12 bg-[#0B0D14] rounded-xl px-3 border border-gray-800 cursor-pointer">
+              <span className="text-gray-500 text-[10px] font-black uppercase mr-2 hidden sm:block">Filtro:</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 mr-2 sm:hidden"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+              <select 
+                value={orden} 
+                onChange={(e) => setOrden(e.target.value)}
+                className="bg-transparent text-gray-300 text-sm font-bold focus:outline-none cursor-pointer appearance-none pr-4"
+              >
+                <option value="Novedades">Novedades</option>
+                <option value="Menor Precio">Menor Precio</option>
+                <option value="Mayor Precio">Mayor Precio</option>
+              </select>
             </div>
 
-            <div className="shrink-0 flex items-center px-2 sm:px-0 border-t border-gray-800 pt-2 sm:border-0 sm:pt-0">
-              <div className="flex items-center bg-[#1A1D24] border border-gray-800 rounded-lg px-3 py-1.5">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 mr-2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-                <select 
-                  value={orden} 
-                  onChange={(e) => setOrden(e.target.value)}
-                  className="bg-transparent text-gray-400 text-xs font-bold focus:outline-none cursor-pointer appearance-none pr-4"
-                >
-                  <option value="Novedades">Novedades</option>
-                  <option value="Menor Precio">Menor Precio</option>
-                  <option value="Mayor Precio">Mayor Precio</option>
-                </select>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* --- NUEVA SECCIÓN: PRODUCTOS DESTACADOS --- */}
-        {/* Solo se muestran si no hay filtros de búsqueda aplicados y si existen destacados */}
+        {/* SECCIÓN: PRODUCTOS DESTACADOS */}
         {productosDestacados.length > 0 && search === '' && categoriaActiva === 'Todas' && (
           <div className="mb-12">
             <div className="flex justify-between items-center mb-6">
@@ -151,7 +164,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* CATÁLOGO GENERAL (Mismo encabezado que tu captura) */}
+        {/* CATÁLOGO GENERAL */}
         <div className="mb-20">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
@@ -167,6 +180,12 @@ export default function HomePage() {
               <span className="text-5xl mb-4 block opacity-50">🛒</span>
               <h3 className="text-xl font-bold text-white mb-2">No se encontraron productos</h3>
               <p className="text-gray-500 text-sm">Intentá con otra búsqueda o categoría.</p>
+              <button 
+                onClick={() => { setSearch(''); setCategoriaActiva('Todas'); }}
+                className="mt-6 bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-6 py-2 rounded-xl transition-transform transform hover:-translate-y-1"
+              >
+                Ver todo el catálogo
+              </button>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -180,7 +199,6 @@ export default function HomePage() {
       </main>
 
       <WhatsAppButton />
-      <Footer />
     </div>
   );
 }
