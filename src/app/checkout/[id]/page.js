@@ -1,144 +1,177 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/context/AuthContext';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+// Asumiendo que tenes un contexto de carrito. Si usas otro nombre, cambialo acá.
+import { useCart } from '@/context/CartContext'; 
 
-export default function CheckoutSuccessPage() {
-  const params = useParams();
-  const id = params?.id; 
+export default function CheckoutPage() {
+  const { cart, cartTotal, clearCart } = useCart();
+  const router = useRouter();
 
-  const { user, loadingAuth } = useAuth();
-  const [order, setOrder] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState({
+    name: '', email: '', phone: '', address: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [orderId, setOrderId] = useState('');
 
-  // === ⚠️ TUS DATOS DE COBRO OFICIALES ⚠️ ===
-  const MI_ALIAS = "santimarquez."; 
-  const MI_TITULAR = "Santiago Alejo Márquez"; 
-  const MI_WHATSAPP = "5493518089416"; 
-  // ==========================================
+  // ⚠️ PONÉ TU NÚMERO DE WHATSAPP ACÁ (Código de área de Córdoba 351)
+  const NUMERO_WHATSAPP = "5493510000000"; 
 
-  useEffect(() => {
-    if (user && id) {
-      fetchOrder();
-    } else if (!loadingAuth && !user) {
-      setLoading(false);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (cart.length === 0) {
+      alert("Tu carrito está vacío.");
+      return;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, id, loadingAuth]);
 
-  const fetchOrder = async () => {
+    setIsSubmitting(true);
     try {
-      const { data, error } = await supabase
-        .from('pedidos')
-        .select('*')
-        .eq('id', id)
-        .single();
+      // Formateamos el pedido para Supabase
+      const newOrder = {
+        user_email: formData.email,
+        user_name: formData.name,
+        user_phone: formData.phone,
+        total: cartTotal,
+        status: 'pendiente',
+        items: cart.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity
+        }))
+      };
 
+      const { data, error } = await supabase.from('pedidos').insert([newOrder]).select().single();
+      
       if (error) throw error;
-      setOrder(data);
+
+      setOrderId(data.id);
+      setIsSuccess(true);
+      clearCart(); 
     } catch (error) {
-      console.error("Error al buscar el pedido:", error);
+      alert(`Error al generar pedido: ${error.message}`);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const copiarAlias = () => {
-    navigator.clipboard.writeText(MI_ALIAS);
-    // Cambiamos el alert nativo por algo más sutil o simplemente dejamos que el usuario sepa que funcionó
-    alert("¡Alias copiado al portapapeles listo para pegar en tu banco!");
-  };
+  // --- PANTALLA DE ÉXITO: Flujo de confirmación por WhatsApp ---
+  if (isSuccess) {
+    const shortOrderId = orderId.split('-')[0].toUpperCase();
+    const whatsappMessage = encodeURIComponent(`¡Hola! Acabo de realizar el pedido #${shortOrderId} en Polirubro Online por un total de $${cartTotal.toLocaleString('es-AR')}.\n\nQuiero confirmar el stock de mis productos y coordinar el tema del envío. ¡Aguardo tu confirmación para poder realizar el pago!`);
+    const whatsappLink = `https://wa.me/${5493518089416}?text=${whatsappMessage}`;
 
-  if (loadingAuth || loading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#FF9980]"></div>
-        <p className="text-[#FF9980] font-bold mt-4 animate-pulse">Preparando tu orden...</p>
-      </div>
-    );
-  }
-
-  if (!order) {
-    return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center text-center p-4">
-        <span className="text-6xl mb-4">⚠️</span>
-        <h1 className="text-2xl font-bold text-gray-100">No encontramos este pedido.</h1>
-        <p className="text-gray-400 mt-2">Puede que el ID no sea correcto o la compra no se haya procesado.</p>
-        <Link href="/perfil" className="mt-6 text-[#FF9980] underline font-bold">Ver Mis Pedidos</Link>
-      </div>
-    );
-  }
-
-  const orderNumber = order.id.split('-')[0].toUpperCase();
-  const mensajeWa = `¡Hola Santiago! Acabo de hacer el pedido #${orderNumber} por $${order.total}. Te adjunto el comprobante de transferencia.`;
-  const linkWhatsapp = `https://wa.me/${MI_WHATSAPP}?text=${encodeURIComponent(mensajeWa)}`;
-
-  return (
-    <div className="max-w-3xl mx-auto p-4 sm:p-8 mt-8 mb-20">
-      <div className="bg-gray-800 p-8 sm:p-12 rounded-3xl border border-gray-700 shadow-2xl text-center relative overflow-hidden">
-        
-        <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-green-400 to-emerald-500"></div>
-
-        <span className="text-7xl block mb-6 animate-bounce">🎉</span>
-        <h1 className="text-3xl sm:text-4xl font-black text-gray-100 mb-2">¡Pedido Generado!</h1>
-        <p className="text-gray-400 text-lg mb-8">
-          Tu orden <strong className="text-white">#{orderNumber}</strong> ya está reservada.
-        </p>
-
-        <div className="bg-gray-900 border border-[#FF9980]/50 rounded-2xl p-6 sm:p-8 mb-8">
-          <h2 className="text-xl font-bold text-[#FF9980] mb-6 uppercase tracking-wider">Instrucciones de Pago</h2>
+      <div className="min-h-screen bg-[#111111] flex items-center justify-center p-4">
+        <div className="max-w-xl w-full bg-gray-900 rounded-3xl border border-gray-800 shadow-2xl p-8 text-center animate-fade-in relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#FF9980] to-purple-600"></div>
           
-          <div className="text-left space-y-4 max-w-sm mx-auto">
-            <div className="flex justify-between border-b border-gray-700 pb-2">
-              <span className="text-gray-400 font-bold mt-1">Total a pagar:</span>
-              <span className="text-white font-black text-2xl">${Number(order.total).toLocaleString('es-AR')}</span>
-            </div>
+          <div className="w-20 h-20 bg-green-900/30 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-green-500/50">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </div>
+          
+          <h1 className="text-3xl font-black text-white mb-2">¡Pedido Reservado!</h1>
+          <p className="text-[#FF9980] font-mono text-lg font-bold mb-8">Orden #{shortOrderId}</p>
+
+          <div className="bg-gray-800 rounded-2xl p-6 mb-8 text-left border border-gray-700">
+            <h2 className="text-white font-bold mb-4 flex items-center gap-2">
+              <span className="bg-[#FF9980] text-gray-900 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black">1</span> 
+              Confirmación Obligatoria
+            </h2>
+            <p className="text-gray-400 text-sm mb-4">
+              Para garantizar que recibas todo perfecto, necesitamos confirmar el stock de tus productos y calcular el costo de envío (si aplica).
+            </p>
             
-            <div className="flex justify-between border-b border-gray-700 pb-3 pt-2 items-center">
-              <span className="text-gray-400 font-bold">Alias:</span>
-              <div className="flex items-center gap-3">
-                <span className="text-white font-black tracking-wide text-lg">{MI_ALIAS}</span>
-                {/* BOTÓN COPIAR MEJORADO */}
-                <button 
-                  onClick={copiarAlias} 
-                  className="bg-gray-700 hover:bg-[#FF9980] hover:text-gray-900 text-white px-3 py-1.5 rounded-lg transition-all transform hover:scale-105 flex items-center gap-2 text-sm font-bold shadow-sm" 
-                  title="Copiar Alias"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                  Copiar
-                </button>
-              </div>
-            </div>
-            
-            <div className="flex justify-between pt-2">
-              <span className="text-gray-400 font-bold">Titular:</span>
-              <span className="text-gray-300 text-sm font-bold">{MI_TITULAR}</span>
-            </div>
+            <a 
+              href={whatsappLink} 
+              target="_blank" 
+              rel="noreferrer"
+              className="w-full bg-[#25D366] hover:bg-[#20b858] text-white font-black py-4 rounded-xl flex items-center justify-center gap-3 transition-transform transform hover:-translate-y-1 shadow-lg shadow-[#25D366]/20"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+              Enviar WhatsApp Ahora
+            </a>
+          </div>
+
+          <div className="bg-gray-800/50 rounded-2xl p-6 text-left border border-gray-700/50">
+            <h2 className="text-gray-300 font-bold mb-2 flex items-center gap-2">
+              <span className="bg-gray-700 text-gray-300 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black">2</span> 
+              Pago y Envío
+            </h2>
+            <p className="text-gray-500 text-sm">
+              Una vez que nos escribas y te confirmemos todo por WhatsApp, ahí mismo te pasaremos nuestro <strong>Alias bancario</strong> para realizar la transferencia y coordinaremos la entrega.
+            </p>
+          </div>
+
+          <button onClick={() => router.push('/')} className="mt-8 text-gray-400 hover:text-white font-bold text-sm transition-colors underline">
+            Volver a la tienda
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- PANTALLA DE FORMULARIO DE CHECKOUT NORMAL ---
+  return (
+    <div className="max-w-3xl mx-auto p-4 sm:p-8 mt-10 mb-20 animate-fade-in">
+      <h1 className="text-3xl font-black text-white mb-8 border-b border-gray-800 pb-4">Finalizar Compra</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+        
+        {/* RESUMEN DEL CARRITO */}
+        <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 h-fit">
+          <h2 className="text-[#FF9980] font-black uppercase tracking-widest text-sm mb-6">Tu Pedido</h2>
+          {cart.length === 0 ? (
+            <p className="text-gray-500">No hay productos.</p>
+          ) : (
+            <ul className="space-y-4 mb-6">
+              {cart.map(item => (
+                <li key={item.id} className="flex justify-between items-center text-sm">
+                  <div className="flex items-center gap-3">
+                    <span className="bg-gray-800 text-gray-300 px-2 py-1 rounded-md font-bold text-xs">{item.quantity}x</span>
+                    <span className="text-gray-200 line-clamp-1">{item.name}</span>
+                  </div>
+                  <span className="font-mono text-gray-400">${(item.price * item.quantity).toLocaleString('es-AR')}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="border-t border-gray-800 pt-4 flex justify-between items-center">
+            <span className="text-white font-bold">Total a pagar</span>
+            <span className="text-2xl font-black text-[#FF9980]">${cartTotal.toLocaleString('es-AR')}</span>
           </div>
         </div>
 
-        <div className="space-y-4 max-w-md mx-auto">
-          <p className="text-gray-300 text-sm font-bold mb-4">
-            Una vez realizada la transferencia, envianos el comprobante haciendo clic en el siguiente botón:
-          </p>
+        {/* FORMULARIO DE DATOS */}
+        <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800">
+          <h2 className="text-[#FF9980] font-black uppercase tracking-widest text-sm mb-6">Tus Datos</h2>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-gray-400 text-xs font-bold mb-2 uppercase">Nombre Completo *</label>
+              <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:border-[#FF9980]" />
+            </div>
+            <div>
+              <label className="block text-gray-400 text-xs font-bold mb-2 uppercase">Email *</label>
+              <input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:border-[#FF9980]" />
+            </div>
+            <div>
+              <label className="block text-gray-400 text-xs font-bold mb-2 uppercase">Teléfono / WhatsApp *</label>
+              <input type="tel" required value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:border-[#FF9980]" />
+            </div>
+            <div>
+              <label className="block text-gray-400 text-xs font-bold mb-2 uppercase">Dirección de Entrega (Opcional)</label>
+              <input type="text" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="Ej: Av. Colón 1234, Dpto 2B" className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:border-[#FF9980]" />
+            </div>
 
-          <a 
-            href={linkWhatsapp} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-3 bg-[#25D366] hover:bg-[#1ebd5a] text-white font-black py-4 px-6 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 text-lg"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 1.777 6.289L.302 23.7l5.568-1.46A11.956 11.956 0 0 0 11.944 24 12 12 0 0 0 24 12 12 12 0 0 0 11.944 0zM7.228 5.704c.264-.002.536.002.77.014.246.012.576.104.752.518.21.488.72 1.764.786 1.896.066.132.112.288.028.456-.084.17-.128.272-.256.422-.128.15-.27.326-.388.456-.134.148-.276.31-.122.578.156.268.694 1.148 1.486 1.854.912.81 1.742 1.066 2.012 1.196.27.13.432.108.594-.078.16-.188.694-.808.88-1.086.186-.276.372-.232.616-.138.244.094 1.544.73 1.808.86.266.132.444.198.508.31.064.11.064.646-.208 1.272-.27.626-1.59 1.232-2.192 1.274-.582.04-1.222.186-3.87-1.074-3.21-1.528-5.26-4.81-5.418-5.022-.158-.212-1.294-1.724-1.294-3.29s.814-2.336 1.11-2.658c.294-.322.642-.404.856-.404z"/></svg>
-            Enviar Comprobante
-          </a>
-
-          <Link href="/perfil" className="block w-full text-gray-400 hover:text-[#FF9980] font-bold underline transition-colors pt-4">
-            Ver estado en Mis Pedidos
-          </Link>
+            <button type="submit" disabled={isSubmitting || cart.length === 0} className="w-full bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black py-4 rounded-xl mt-4 transition-transform transform hover:-translate-y-1 disabled:opacity-50 disabled:transform-none">
+              {isSubmitting ? 'Procesando...' : 'Confirmar Pedido'}
+            </button>
+          </form>
         </div>
+
       </div>
     </div>
   );

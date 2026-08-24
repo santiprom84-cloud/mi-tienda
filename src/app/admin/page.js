@@ -18,13 +18,11 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('pedidos'); 
   const [adminProductSearch, setAdminProductSearch] = useState('');
 
-  // ESTADOS DEL MODO SEGURO IA MASIVO (Este sí funciona y lo dejamos)
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [aiPromptText, setAiPromptText] = useState('');
   const [aiResponseText, setAiResponseText] = useState('');
   const [isApplyingAI, setIsApplyingAI] = useState(false);
 
-  // Estados del Formulario de Productos
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [productForm, setProductForm] = useState({
@@ -37,7 +35,6 @@ export default function AdminDashboard() {
 
   const ADMIN_EMAIL = 'santiprom84@gmail.com';
 
-  // Categorías predefinidas para el Dropdown (A prueba de fallos)
   const CATEGORIAS_BASE = [
     "Tecnología y Gaming",
     "Bazar y Hogar",
@@ -47,7 +44,7 @@ export default function AdminDashboard() {
     "Indumentaria",
     "Juguetería",
     "Ferretería",
-    "Otra..." // Opción para escribir a mano
+    "Otra..." 
   ];
 
   useEffect(() => {
@@ -102,17 +99,17 @@ export default function AdminDashboard() {
     }
   };
 
+  // FUNCIÓN PARA BORRAR PEDIDOS (Ahora conectada al nuevo botón)
   const deleteOrder = async (id) => {
-    if (!window.confirm("¿Rechazar y borrar pedido?")) return;
+    if (!window.confirm("⚠️ ¿Estás seguro de eliminar este pedido por completo? Esta acción no se puede deshacer.")) return;
     try {
       await supabase.from('pedidos').delete().eq('id', id);
       setOrders(orders.filter(order => order.id !== id));
     } catch (error) {
-      alert(`Error al borrar: ${error.message}`);
+      alert(`Error al borrar pedido: ${error.message}`);
     }
   };
 
-  // --- MODO SEGURO IA (Catálogo Masivo) ---
   const openAIModal = () => {
     const productsToClassify = adminProducts.map(p => ({ id: p.id, name: p.name }));
     const prompt = `Eres un experto en e-commerce. Analiza estos productos y asígnales una categoría principal.
@@ -167,10 +164,8 @@ ${JSON.stringify(productsToClassify)}`;
     alert("¡Comando copiado! Pegalo en ChatGPT o Gemini.");
   };
 
-  // --- FUNCIONES DE PRODUCTOS ROBUSTAS ---
   const openProductModal = (product = null) => {
     if (product) {
-      // Determinamos si la categoría del producto está en la lista base
       const isKnownCategory = CATEGORIAS_BASE.includes(product.category);
       setEditingProduct(product);
       setProductForm({
@@ -188,13 +183,11 @@ ${JSON.stringify(productsToClassify)}`;
     setIsProductModalOpen(true);
   };
 
-  // FUNCIÓN GUARDAR: Rápida, sin APIs externas, 100% infalible
   const saveProduct = async (e) => {
     e.preventDefault();
     setSavingProduct(true);
     
     try {
-      // Si eligió "Otra...", usamos lo que escribió a mano. Si no, usamos lo que seleccionó.
       let finalCategory = productForm.category === 'Otra...' 
         ? productForm.customCategory.trim() 
         : productForm.category;
@@ -357,7 +350,6 @@ ${JSON.stringify(productsToClassify)}`;
               <button 
                 onClick={openAIModal}
                 className="w-full sm:w-auto bg-[#FF9980]/20 hover:bg-[#FF9980]/30 text-[#FF9980] border border-[#FF9980]/50 font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2"
-                title="Herramienta a prueba de fallos para ordenar el catálogo usando ChatGPT"
               >
                 🧠 Reordenar Catálogo
               </button>
@@ -464,7 +456,7 @@ ${JSON.stringify(productsToClassify)}`;
         </div>
       )}
 
-      {/* MODAL: CREAR / EDITAR PRODUCTO CON DROPDOWN INFALIBLE */}
+      {/* MODAL: CREAR / EDITAR PRODUCTO */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsProductModalOpen(false)}></div>
@@ -531,7 +523,6 @@ ${JSON.stringify(productsToClassify)}`;
                     <input type="number" required min="0" step="0.01" value={productForm.price} onChange={(e) => setProductForm({...productForm, price: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors" placeholder="Ej: 15500" />
                   </div>
                   
-                  {/* SELECTOR MANUAL: Cero fallos, cero APIs */}
                   <div>
                     <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Categoría *</label>
                     <select 
@@ -544,7 +535,6 @@ ${JSON.stringify(productsToClassify)}`;
                       ))}
                     </select>
 
-                    {/* Si selecciona "Otra...", aparece este input para que escriba */}
                     {productForm.category === 'Otra...' && (
                       <input 
                         type="text" 
@@ -624,9 +614,13 @@ ${JSON.stringify(productsToClassify)}`;
                       <span className="text-gray-400 font-bold">Total a cobrar:</span>
                       <span className="text-2xl font-black text-[#FF9980]">${Number(order.total).toLocaleString('es-AR')}</span>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button onClick={() => updateOrderStatus(order.id, 'pagado')} disabled={order.status === 'pagado'} className="flex-1 bg-green-600 hover:bg-green-500 text-white text-xs font-bold py-3 rounded-lg">Marcar Pagado</button>
-                      <button onClick={() => updateOrderStatus(order.id, 'enviado')} disabled={order.status === 'enviado'} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-3 rounded-lg">Marcar Enviado</button>
+                    {/* BOTONES ACTUALIZADOS: PAGADO / ENVIADO / BORRAR */}
+                    <div className="flex gap-2">
+                      <button onClick={() => updateOrderStatus(order.id, 'pagado')} disabled={order.status === 'pagado'} className="flex-1 bg-green-600 hover:bg-green-500 text-white text-xs font-bold py-3 rounded-lg disabled:opacity-50 transition-colors">Marcar Pagado</button>
+                      <button onClick={() => updateOrderStatus(order.id, 'enviado')} disabled={order.status === 'enviado'} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-3 rounded-lg disabled:opacity-50 transition-colors">Marcar Enviado</button>
+                      <button onClick={() => deleteOrder(order.id)} className="flex-none bg-red-900/50 hover:bg-red-600 text-red-400 hover:text-white border border-red-800/50 px-4 text-xs font-bold py-3 rounded-lg transition-colors" title="Eliminar Pedido">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                      </button>
                     </div>
                   </div>
                 </div>
