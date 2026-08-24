@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter, useParams } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
-import { useAuth } from '@/context/AuthContext'; // Importamos la sesión del usuario
+import { useAuth } from '@/context/AuthContext'; 
 
 export default function DynamicCheckoutPage() {
   const params = useParams();
@@ -12,21 +12,26 @@ export default function DynamicCheckoutPage() {
   
   const router = useRouter();
   const { clearCart } = useCart();
-  const { user } = useAuth(); // Traemos los datos de si está logueado
+  const { user } = useAuth(); 
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
 
-  // El formulario ahora solo pide el nombre
   const [formData, setFormData] = useState({ name: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  // ⚠️ PONÉ TU NÚMERO DE WHATSAPP ACÁ (Código de área de Córdoba 351)
-  const NUMERO_WHATSAPP = "5493510000000"; 
+  // ⚠️ CONFIGURACIÓN DE TUS DATOS DE COBRO
+  const NUMERO_WHATSAPP = "5493518089416"; 
+  const DATOS_BANCO = {
+    titular: "Santiago Alejo Márquez",
+    alias: "santimarquez.", // Cambiá esto por tu alias real
+    cvu: "0000003100068476283673",
+    banco: "Mercado Pago"
+  };
 
-  // Autocompletar el nombre si el usuario ya inició sesión
   useEffect(() => {
     if (user) {
       const defaultName = user.user_metadata?.full_name || user.email?.split('@')[0] || '';
@@ -34,7 +39,6 @@ export default function DynamicCheckoutPage() {
     }
   }, [user]);
 
-  // Buscar el pedido en la base de datos
   useEffect(() => {
     if (!id) return;
 
@@ -60,15 +64,14 @@ export default function DynamicCheckoutPage() {
     fetchOrder();
   }, [id]);
 
-  // Actualizar el nombre en la orden y pasar a la pantalla de WhatsApp
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
       const { error } = await supabase.from('pedidos').update({
         user_name: formData.name,
-        user_email: user?.email || 'Invitado sin email', // Guardamos el email de fondo si existe
-        user_phone: 'A confirmar por WhatsApp', // Rellenamos para que no quede nulo
+        user_email: user?.email || 'Invitado sin email', 
+        user_phone: 'A confirmar por WhatsApp', 
       }).eq('id', id);
 
       if (error) throw error;
@@ -82,7 +85,12 @@ export default function DynamicCheckoutPage() {
     }
   };
 
-  // --- PANTALLA DE CARGA ---
+  const copiarAlias = () => {
+    navigator.clipboard.writeText(DATOS_BANCO.alias);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   if (loading) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center animate-fade-in">
@@ -92,7 +100,6 @@ export default function DynamicCheckoutPage() {
     );
   }
 
-  // --- PANTALLA DE ERROR VISUAL ---
   if (fetchError || !order) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-4 animate-fade-in">
@@ -108,43 +115,86 @@ export default function DynamicCheckoutPage() {
     );
   }
 
-  // --- PANTALLA DE ÉXITO (EL CARTEL DE WHATSAPP) ---
+  // --- PANTALLA DE ÉXITO ACTUALIZADA CON DATOS BANCARIOS ---
   if (isSuccess && order) {
     const shortOrderId = order.id.split('-')[0].toUpperCase();
-    // TEXTO EXACTO QUE PEDISTE
     const whatsappMessage = encodeURIComponent(`¡Hola! Acabo de registrar mis datos para el pedido #${shortOrderId} en Polirubro Online por un total de $${order.total.toLocaleString('es-AR')}.\n\nQuiero confirmar el pedido para ver si hay stock y ver el tema del envío.`);
     const whatsappLink = `https://wa.me/${5493518089416}?text=${whatsappMessage}`;
 
     return (
-      <div className="min-h-[80vh] flex items-center justify-center p-4">
-        <div className="max-w-xl w-full bg-gray-900 rounded-3xl border border-gray-800 shadow-2xl p-8 text-center animate-fade-in relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#25D366] to-[#128C7E]"></div>
+      <div className="min-h-[90vh] flex items-center justify-center p-4 py-12">
+        <div className="max-w-2xl w-full bg-gray-900 rounded-3xl border border-gray-800 shadow-2xl p-6 sm:p-10 animate-fade-in relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#FF9980] to-purple-600"></div>
           
-          <div className="w-24 h-24 bg-[#25D366]/20 text-[#25D366] rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-[#25D366]/50 shadow-[0_0_30px_rgba(37,211,102,0.3)]">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-green-900/30 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-green-500/50">
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <h1 className="text-3xl font-black text-white mb-2">¡Pedido Reservado!</h1>
+            <p className="text-[#FF9980] font-mono text-lg font-bold">Orden #{shortOrderId}</p>
           </div>
-          
-          <h1 className="text-3xl font-black text-white mb-2">¡Último Paso!</h1>
-          <p className="text-gray-400 mb-8">Orden reservada bajo el código <strong className="text-white">#{shortOrderId}</strong></p>
 
-          <div className="bg-gray-800 rounded-2xl p-6 mb-8 text-left border border-gray-700">
-            <p className="text-gray-300 text-center font-medium">
-              Escribinos por WhatsApp para confirmar que tenemos stock de tus productos y coordinar la entrega.
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* PASO 1: DATOS PARA TRANSFERIR */}
+            <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 relative overflow-hidden">
+              <h2 className="text-white font-bold mb-4 flex items-center gap-2">
+                <span className="bg-[#FF9980] text-gray-900 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black">1</span> 
+                Datos de Pago
+              </h2>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <p className="text-gray-500 text-xs font-bold uppercase">Banco</p>
+                  <p className="text-gray-200 font-medium">{DATOS_BANCO.banco}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-xs font-bold uppercase">Titular</p>
+                  <p className="text-gray-200 font-medium">{DATOS_BANCO.titular}</p>
+                </div>
+                <div className="bg-gray-900 p-3 rounded-xl border border-gray-700 flex justify-between items-center mt-2">
+                  <div>
+                    <p className="text-gray-500 text-xs font-bold uppercase mb-1">Alias</p>
+                    <p className="text-[#FF9980] font-mono font-bold tracking-wider">{DATOS_BANCO.alias}</p>
+                  </div>
+                  <button onClick={copiarAlias} className="text-gray-400 hover:text-white transition-colors p-2 bg-gray-800 rounded-lg" title="Copiar Alias">
+                    {copied ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#25D366" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* PASO 2: CONFIRMAR POR WHATSAPP */}
+            <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 flex flex-col justify-between">
+              <div>
+                <h2 className="text-white font-bold mb-4 flex items-center gap-2">
+                  <span className="bg-[#FF9980] text-gray-900 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black">2</span> 
+                  Confirmación
+                </h2>
+                <p className="text-gray-400 text-sm mb-4 leading-relaxed">
+                  Realizá la transferencia y envianos el comprobante por WhatsApp para confirmar stock y coordinar tu envío.
+                </p>
+              </div>
+              
+              <a 
+                href={whatsappLink} 
+                target="_blank" 
+                rel="noreferrer"
+                className="w-full bg-[#25D366] hover:bg-[#20b858] text-gray-900 font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-transform transform hover:-translate-y-1 shadow-lg shadow-[#25D366]/20 text-sm"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                Enviar Comprobante
+              </a>
+            </div>
           </div>
-            
-          <a 
-            href={whatsappLink} 
-            target="_blank" 
-            rel="noreferrer"
-            className="w-full bg-[#25D366] hover:bg-[#20b858] text-gray-900 font-black py-4 rounded-xl flex items-center justify-center gap-3 transition-transform transform hover:-translate-y-1 shadow-xl shadow-[#25D366]/20 text-lg"
-          >
-            Confirmar por WhatsApp
-          </a>
 
-          <button onClick={() => router.push('/')} className="mt-8 text-gray-500 hover:text-white font-bold text-sm transition-colors underline">
-            Volver a la tienda
-          </button>
+          <div className="text-center">
+            <button onClick={() => router.push('/')} className="text-gray-500 hover:text-white font-bold text-sm transition-colors underline">
+              Volver a la tienda
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -160,7 +210,6 @@ export default function DynamicCheckoutPage() {
       
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
         
-        {/* COLUMNA IZQUIERDA: RESUMEN PREMIUM CON IMÁGENES */}
         <div className="lg:col-span-3 bg-gray-900 p-6 sm:p-8 rounded-3xl border border-gray-800 shadow-xl h-fit">
           <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
             <h2 className="text-[#FF9980] font-black uppercase tracking-widest text-sm">Resumen de tu pedido</h2>
@@ -171,7 +220,6 @@ export default function DynamicCheckoutPage() {
             {order.items && order.items.map((item, index) => (
               <li key={index} className="flex items-center justify-between bg-gray-800/40 p-3 sm:p-4 rounded-2xl border border-gray-700/50 hover:bg-gray-800 transition-colors">
                 <div className="flex items-center gap-4">
-                  {/* CUADRO DE IMAGEN DEL PRODUCTO */}
                   <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-900 rounded-xl flex-shrink-0 overflow-hidden border border-gray-700 flex items-center justify-center">
                     {item.image ? (
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
@@ -197,7 +245,6 @@ export default function DynamicCheckoutPage() {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: FORMULARIO SIMPLIFICADO */}
         <div className="lg:col-span-2">
           <div className="bg-gray-900 p-6 sm:p-8 rounded-3xl border border-gray-800 shadow-xl sticky top-24">
             <h2 className="text-[#FF9980] font-black uppercase tracking-widest text-sm mb-6 border-b border-gray-800 pb-4">Tus Datos</h2>
@@ -217,7 +264,7 @@ export default function DynamicCheckoutPage() {
 
               <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700/50">
                 <p className="text-xs text-gray-400 leading-relaxed">
-                  Al confirmar, te redirigiremos a <strong className="text-[#25D366]">WhatsApp</strong> para que nos envíes un mensaje y podamos coordinar el envío de tus productos de forma personalizada.
+                  Al confirmar, te mostraremos los datos del banco para transferir y te redirigiremos a <strong className="text-[#25D366]">WhatsApp</strong> para coordinar el envío de tus productos.
                 </p>
               </div>
 
