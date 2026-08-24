@@ -23,11 +23,11 @@ export default function DynamicCheckoutPage() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // ⚠️ CONFIGURACIÓN DE TUS DATOS DE COBRO
+  // DATOS REALES DE COBRO Y CONTACTO
   const NUMERO_WHATSAPP = "5493518089416"; 
   const DATOS_BANCO = {
     titular: "Santiago Alejo Márquez",
-    alias: "santimarquez.", // Cambiá esto por tu alias real
+    alias: "santimarquez.", 
     cvu: "0000003100068476283673",
     banco: "Mercado Pago"
   };
@@ -115,15 +115,15 @@ export default function DynamicCheckoutPage() {
     );
   }
 
-  // --- PANTALLA DE ÉXITO ACTUALIZADA CON DATOS BANCARIOS ---
+  // --- PANTALLA DE ÉXITO ACTUALIZADA: NUEVO FLUJO ---
   if (isSuccess && order) {
     const shortOrderId = order.id.split('-')[0].toUpperCase();
-    const whatsappMessage = encodeURIComponent(`¡Hola! Acabo de registrar mis datos para el pedido #${shortOrderId} en Polirubro Online por un total de $${order.total.toLocaleString('es-AR')}.\n\nQuiero confirmar el pedido para ver si hay stock y ver el tema del envío.`);
+    const whatsappMessage = encodeURIComponent(`¡Hola! Acabo de registrar el pedido #${shortOrderId} en la tienda por un total de $${order.total.toLocaleString('es-AR')}.\n\nQuiero confirmar si tienen stock de mis productos y consultar por el envío antes de hacer la transferencia.`);
     const whatsappLink = `https://wa.me/${5493518089416}?text=${whatsappMessage}`;
 
     return (
       <div className="min-h-[90vh] flex items-center justify-center p-4 py-12">
-        <div className="max-w-2xl w-full bg-gray-900 rounded-3xl border border-gray-800 shadow-2xl p-6 sm:p-10 animate-fade-in relative overflow-hidden">
+        <div className="max-w-3xl w-full bg-gray-900 rounded-3xl border border-gray-800 shadow-2xl p-6 sm:p-10 animate-fade-in relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#FF9980] to-purple-600"></div>
           
           <div className="text-center mb-8">
@@ -135,27 +135,58 @@ export default function DynamicCheckoutPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* PASO 1: DATOS PARA TRANSFERIR */}
-            <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 relative overflow-hidden">
+            {/* PASO 1: CONFIRMAR POR WHATSAPP */}
+            <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 flex flex-col justify-between relative overflow-hidden shadow-lg">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-[#25D366]/10 rounded-bl-full -mr-2 -mt-2"></div>
+              <div>
+                <h2 className="text-white font-bold mb-4 flex items-center gap-2 relative z-10">
+                  <span className="bg-[#FF9980] text-gray-900 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black">1</span> 
+                  Confirmar Stock
+                </h2>
+                <p className="text-gray-400 text-sm mb-6 leading-relaxed relative z-10">
+                  Antes de transferir, escribinos por WhatsApp para asegurarnos de tener todo listo y coordinar el envío.
+                </p>
+              </div>
+              
+              <a 
+                href={whatsappLink} 
+                target="_blank" 
+                rel="noreferrer"
+                className="w-full bg-[#25D366] hover:bg-[#20b858] text-gray-900 font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-transform transform hover:-translate-y-1 shadow-lg shadow-[#25D366]/20 text-sm relative z-10"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                Confirmar por WhatsApp
+              </a>
+            </div>
+
+            {/* PASO 2: DATOS DE PAGO (SOLO DESPUÉS DEL OK) */}
+            <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 relative overflow-hidden shadow-lg opacity-90">
               <h2 className="text-white font-bold mb-4 flex items-center gap-2">
-                <span className="bg-[#FF9980] text-gray-900 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black">1</span> 
+                <span className="bg-[#FF9980] text-gray-900 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black">2</span> 
                 Datos de Pago
               </h2>
+              <p className="text-gray-500 text-xs mb-4">
+                Una vez que te demos el OK por mensaje, transferí a esta cuenta:
+              </p>
               <div className="space-y-3 text-sm">
-                <div>
-                  <p className="text-gray-500 text-xs font-bold uppercase">Banco</p>
-                  <p className="text-gray-200 font-medium">{DATOS_BANCO.banco}</p>
+                <div className="flex justify-between items-center border-b border-gray-700/50 pb-2">
+                  <span className="text-gray-500 text-xs font-bold uppercase">Banco</span>
+                  <span className="text-gray-200 font-medium text-right">{DATOS_BANCO.banco}</span>
                 </div>
-                <div>
-                  <p className="text-gray-500 text-xs font-bold uppercase">Titular</p>
-                  <p className="text-gray-200 font-medium">{DATOS_BANCO.titular}</p>
+                <div className="flex justify-between items-center border-b border-gray-700/50 pb-2">
+                  <span className="text-gray-500 text-xs font-bold uppercase">Titular</span>
+                  <span className="text-gray-200 font-medium text-right truncate pl-4">{DATOS_BANCO.titular}</span>
                 </div>
-                <div className="bg-gray-900 p-3 rounded-xl border border-gray-700 flex justify-between items-center mt-2">
+                <div className="flex justify-between items-center border-b border-gray-700/50 pb-2">
+                  <span className="text-gray-500 text-xs font-bold uppercase">CVU</span>
+                  <span className="text-gray-200 font-medium text-right tracking-wider">{DATOS_BANCO.cvu}</span>
+                </div>
+                <div className="bg-gray-900 p-3 rounded-xl border border-gray-700 flex justify-between items-center mt-4">
                   <div>
                     <p className="text-gray-500 text-xs font-bold uppercase mb-1">Alias</p>
-                    <p className="text-[#FF9980] font-mono font-bold tracking-wider">{DATOS_BANCO.alias}</p>
+                    <p className="text-[#FF9980] font-mono font-bold tracking-wider text-base">{DATOS_BANCO.alias}</p>
                   </div>
-                  <button onClick={copiarAlias} className="text-gray-400 hover:text-white transition-colors p-2 bg-gray-800 rounded-lg" title="Copiar Alias">
+                  <button onClick={copiarAlias} className="text-gray-400 hover:text-white transition-colors p-3 bg-gray-800 hover:bg-gray-700 rounded-xl" title="Copiar Alias">
                     {copied ? (
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#25D366" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     ) : (
@@ -164,29 +195,6 @@ export default function DynamicCheckoutPage() {
                   </button>
                 </div>
               </div>
-            </div>
-
-            {/* PASO 2: CONFIRMAR POR WHATSAPP */}
-            <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 flex flex-col justify-between">
-              <div>
-                <h2 className="text-white font-bold mb-4 flex items-center gap-2">
-                  <span className="bg-[#FF9980] text-gray-900 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black">2</span> 
-                  Confirmación
-                </h2>
-                <p className="text-gray-400 text-sm mb-4 leading-relaxed">
-                  Realizá la transferencia y envianos el comprobante por WhatsApp para confirmar stock y coordinar tu envío.
-                </p>
-              </div>
-              
-              <a 
-                href={whatsappLink} 
-                target="_blank" 
-                rel="noreferrer"
-                className="w-full bg-[#25D366] hover:bg-[#20b858] text-gray-900 font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-transform transform hover:-translate-y-1 shadow-lg shadow-[#25D366]/20 text-sm"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-                Enviar Comprobante
-              </a>
             </div>
           </div>
 
@@ -200,7 +208,7 @@ export default function DynamicCheckoutPage() {
     );
   }
 
-  // --- PANTALLA DE FORMULARIO DE DATOS REDISEÑADA ---
+  // --- PANTALLA DE FORMULARIO ---
   return (
     <div className="max-w-5xl mx-auto p-4 sm:p-8 mt-10 mb-20 animate-fade-in">
       <div className="text-center mb-10">
@@ -264,7 +272,7 @@ export default function DynamicCheckoutPage() {
 
               <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700/50">
                 <p className="text-xs text-gray-400 leading-relaxed">
-                  Al confirmar, te mostraremos los datos del banco para transferir y te redirigiremos a <strong className="text-[#25D366]">WhatsApp</strong> para coordinar el envío de tus productos.
+                  Al confirmar, te daremos los pasos para consultar el stock por <strong className="text-[#25D366]">WhatsApp</strong> y te mostraremos los datos para transferir de forma segura.
                 </p>
               </div>
 
