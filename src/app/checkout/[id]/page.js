@@ -105,7 +105,7 @@ export default function DynamicCheckoutPage() {
   if (isSuccess && order) {
     const shortOrderId = order.id.split('-')[0].toUpperCase();
     const whatsappMessage = encodeURIComponent(`¡Hola! Acabo de registrar mis datos para el pedido #${shortOrderId} en Polirubro Online por un total de $${order.total.toLocaleString('es-AR')}.\n\nQuiero confirmar el stock de los productos y coordinar el envío. ¡Aguardo tu confirmación!`);
-    const whatsappLink = `https://wa.me/${NUMERO_WHATSAPP}?text=${whatsappMessage}`;
+    const whatsappLink = `https://wa.me/${5493518089416}?text=${whatsappMessage}`;
 
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-4">
