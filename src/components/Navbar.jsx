@@ -11,7 +11,7 @@ export default function Navbar() {
   const pathname = usePathname(); // <-- Guardamos la ruta actual
 
   const totalItems = cart ? cart.reduce((total, item) => total + (item.quantity || 1), 0) : 0;
-  const instagramUrl = "https://instagram.com/tu_usuario_aca";
+  const instagramUrl = "https://instagram.com/polirubroonline.cba";
 
   const isAdmin = user?.email === 'santiprom84@gmail.com';
   
