@@ -409,6 +409,184 @@ ${JSON.stringify(productsToClassify)}`;
         </div>
       )}
 
+      {/* ===================== TAB: PEDIDOS ===================== */}
+      {activeTab === 'pedidos' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-lg gap-3">
+            <div>
+              <h2 className="text-xl font-black text-white">Gestión de Pedidos</h2>
+              <p className="text-gray-400 text-sm">{orders.length} pedidos registrados en total.</p>
+            </div>
+            <button onClick={fetchAdminData} className="bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              Actualizar
+            </button>
+          </div>
+
+          {orders.length === 0 ? (
+            <div className="text-center py-20 bg-gray-800 rounded-2xl border border-gray-700">
+              <span className="text-5xl block mb-4">🛍️</span>
+              <p className="text-gray-400 font-bold">No hay pedidos registrados todavía.</p>
+            </div>
+          ) : (
+            <div className="bg-gray-800 rounded-2xl border border-gray-700 shadow-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-gray-300">
+                  <thead className="bg-gray-900 text-xs uppercase text-gray-500 border-b border-gray-700">
+                    <tr>
+                      <th className="px-5 py-4 font-black">Orden</th>
+                      <th className="px-5 py-4 font-black">Cliente</th>
+                      <th className="px-5 py-4 font-black">Fecha</th>
+                      <th className="px-5 py-4 font-black">Total</th>
+                      <th className="px-5 py-4 font-black">Estado</th>
+                      <th className="px-5 py-4 font-black text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((order) => (
+                      <tr key={order.id} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
+                        <td className="px-5 py-3">
+                          <span className="font-mono text-xs text-[#FF9980] font-bold bg-[#FF9980]/10 px-2 py-1 rounded-md">
+                            #{(order.id || '').split('-')[0].toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3">
+                          <p className="font-bold text-gray-100 truncate max-w-[150px]">{order.user_name || order.nombre_cliente || 'Anónimo'}</p>
+                          <p className="text-gray-500 text-xs truncate max-w-[150px]">{order.user_email || order.email || ''}</p>
+                        </td>
+                        <td className="px-5 py-3 text-gray-400 text-xs whitespace-nowrap">{formatDate(order.created_at)}</td>
+                        <td className="px-5 py-3 font-black text-[#FF9980]">${Number(order.total).toLocaleString('es-AR')}</td>
+                        <td className="px-5 py-3">
+                          <select
+                            value={order.status || order.estado || 'pendiente'}
+                            onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                            className="bg-gray-900 border border-gray-600 rounded-lg px-2 py-1.5 text-xs font-bold text-gray-200 focus:outline-none focus:border-[#FF9980] cursor-pointer"
+                          >
+                            <option value="pendiente">🟡 Pendiente</option>
+                            <option value="pagado">🟢 Pagado</option>
+                            <option value="enviado">🔵 Enviado</option>
+                            <option value="cancelado">🔴 Cancelado</option>
+                          </select>
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <button onClick={() => deleteOrder(order.id)} className="bg-red-900/50 text-red-400 hover:bg-red-900 border border-red-800/50 px-3 py-1.5 rounded-lg font-bold text-xs transition-colors">
+                            Borrar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===================== TAB: USUARIOS ===================== */}
+      {activeTab === 'usuarios' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-lg gap-3">
+            <div>
+              <h2 className="text-xl font-black text-white">Usuarios Registrados</h2>
+              <p className="text-gray-400 text-sm">{registeredUsers.length} cuentas creadas en la tienda.</p>
+            </div>
+            <button onClick={fetchAdminData} className="bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              Actualizar
+            </button>
+          </div>
+
+          {registeredUsers.length === 0 ? (
+            <div className="text-center py-20 bg-gray-800 rounded-2xl border border-gray-700">
+              <span className="text-5xl block mb-4">👥</span>
+              <p className="text-gray-400 font-bold">No hay usuarios registrados todavía.</p>
+            </div>
+          ) : (
+            <div className="bg-gray-800 rounded-2xl border border-gray-700 shadow-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-gray-300">
+                  <thead className="bg-gray-900 text-xs uppercase text-gray-500 border-b border-gray-700">
+                    <tr>
+                      <th className="px-6 py-4 font-black">Email</th>
+                      <th className="px-6 py-4 font-black">Nombre</th>
+                      <th className="px-6 py-4 font-black">Registrado</th>
+                      <th className="px-6 py-4 font-black">Último acceso</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {registeredUsers.map((u, i) => (
+                      <tr key={u.id || i} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
+                        <td className="px-6 py-3">
+                          <span className="font-mono text-gray-100 text-xs">{u.email}</span>
+                        </td>
+                        <td className="px-6 py-3 text-gray-300 font-bold text-sm">
+                          {u.full_name || u.raw_user_meta_data?.full_name || <span className="text-gray-600 italic">Sin nombre</span>}
+                        </td>
+                        <td className="px-6 py-3 text-gray-400 text-xs whitespace-nowrap">
+                          {u.created_at ? formatDate(u.created_at) : '—'}
+                        </td>
+                        <td className="px-6 py-3 text-gray-400 text-xs whitespace-nowrap">
+                          {u.last_sign_in_at ? formatDate(u.last_sign_in_at) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===================== TAB: RADAR EN VIVO ===================== */}
+      {activeTab === 'radar' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-lg">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+              <h2 className="text-xl font-black text-white">Radar en Vivo</h2>
+            </div>
+            <p className="text-gray-400 text-sm">Usuarios con sesión activa en este momento.</p>
+          </div>
+
+          {activeUsers.length === 0 ? (
+            <div className="text-center py-20 bg-gray-800 rounded-2xl border border-gray-700">
+              <span className="text-5xl block mb-4 opacity-50">📡</span>
+              <p className="text-gray-400 font-bold text-lg">Nadie conectado ahora mismo</p>
+              <p className="text-gray-600 text-sm mt-2">Los usuarios aparecerán aquí cuando naveguen la tienda con sesión iniciada.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeUsers.map((u, i) => (
+                <div key={i} className="bg-gray-800 border border-green-500/20 rounded-2xl p-5 shadow-lg relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/5 rounded-bl-full"></div>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="bg-gray-900 w-10 h-10 rounded-full flex items-center justify-center border border-gray-700 shrink-0">
+                      <span className="text-lg">👤</span>
+                    </div>
+                    <div className="overflow-hidden">
+                      <p className="text-gray-100 font-bold text-sm truncate">{u.email || 'Anónimo'}</p>
+                      <span className="text-green-400 text-xs font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span> En línea
+                      </span>
+                    </div>
+                  </div>
+                  {u.online_at && (
+                    <p className="text-gray-600 text-xs">
+                      Desde: {new Date(u.online_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* MODAL: CREAR / EDITAR PRODUCTO */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
