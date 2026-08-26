@@ -4,8 +4,8 @@ export function middleware(request) {
   // Obtenemos la ruta a la que el usuario quiere entrar
   const path = request.nextUrl.pathname;
 
-  // Si la ruta es el panel de admin (o cualquier cosa adentro del panel)
-  if (path.startsWith('/admin-secreto')) {
+  // Protegemos tanto /admin como /admin-secreto
+  if (path.startsWith('/admin') || path.startsWith('/admin-secreto')) {
     // Buscamos la cookie de autorización
     const token = request.cookies.get('admin_token')?.value;
 
@@ -21,5 +21,5 @@ export function middleware(request) {
 
 // Acá le decimos a Next.js qué rutas debe vigilar este middleware para no gastar recursos
 export const config = {
-  matcher: ['/admin-secreto/:path*'],
+  matcher: ['/admin/:path*', '/admin-secreto/:path*'],
 };

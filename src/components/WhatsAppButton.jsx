@@ -4,14 +4,14 @@ export default function WhatsAppButton() {
   // ATENCIÓN: Reemplazá este número por tu celular real.
   // Formato: Código de país (54) + 9 + Código de área de Córdoba (351) + tu número sin el 15.
   // Ejemplo: "5493511234567"
-  const phoneNumber = "5493518089416"; 
+  const phoneNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
   
   // Mensaje predeterminado con el que te va a llegar el WhatsApp
   const defaultMessage = "¡Hola Polirubro Online! Vengo de la tienda y tengo una consulta sobre un producto.";
 
   return (
     <a
-      href={`https://wa.me/${5493518089416}?text=${encodeURIComponent(defaultMessage)}`}
+      href={`https://wa.me/${phoneNumber}?text=${encodeURIComponent(defaultMessage)}`}
       target="_blank"
       rel="noopener noreferrer"
       // El "z-[100]" asegura que flote por encima de absolutamente todo

@@ -24,12 +24,12 @@ export default function DynamicCheckoutPage() {
   const [copied, setCopied] = useState(false);
 
   // DATOS REALES DE COBRO Y CONTACTO
-  const NUMERO_WHATSAPP = "5493518089416"; 
+  const NUMERO_WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
   const DATOS_BANCO = {
-    titular: "Santiago Alejo Márquez",
-    alias: "santimarquez.", 
-    cvu: "0000003100068476283673",
-    banco: "Mercado Pago"
+    titular: process.env.NEXT_PUBLIC_BANK_TITULAR,
+    alias: process.env.NEXT_PUBLIC_BANK_ALIAS,
+    cvu: process.env.NEXT_PUBLIC_BANK_CVU,
+    banco: process.env.NEXT_PUBLIC_BANK_NOMBRE
   };
 
   useEffect(() => {
@@ -119,7 +119,7 @@ export default function DynamicCheckoutPage() {
   if (isSuccess && order) {
     const shortOrderId = order.id.split('-')[0].toUpperCase();
     const whatsappMessage = encodeURIComponent(`¡Hola! Acabo de registrar el pedido #${shortOrderId} en la tienda por un total de $${order.total.toLocaleString('es-AR')}.\n\nQuiero confirmar si tienen stock de mis productos y consultar por el envío antes de hacer la transferencia.`);
-    const whatsappLink = `https://wa.me/${5493518089416}?text=${whatsappMessage}`;
+    const whatsappLink = `https://wa.me/${NUMERO_WHATSAPP}?text=${whatsappMessage}`;
 
     return (
       <div className="min-h-[90vh] flex items-center justify-center p-4 py-12">

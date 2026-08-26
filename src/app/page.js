@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import ProductCard from '@/components/ProductCard';
-import WhatsAppButton from '@/components/WhatsAppButton';
 
 // ATENCIÓN: Eliminamos la importación del Navbar y el Footer porque ya están en layout.js (esto causaba que se vean dobles)
 
@@ -198,7 +197,6 @@ export default function HomePage() {
 
       </main>
 
-      <WhatsAppButton />
     </div>
   );
 }
