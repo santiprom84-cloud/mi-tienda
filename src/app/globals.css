@@ -11,3 +11,9 @@
   background-color: #374151;
   border-radius: 9999px;
 }
+
+/* Animación shimmer para skeleton loaders */
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

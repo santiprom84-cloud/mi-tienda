@@ -2,6 +2,7 @@
 
 import { useCart } from '@/context/CartContext';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function ProductCard({ product }) {
   const { addToCart } = useCart();
@@ -13,11 +14,12 @@ export default function ProductCard({ product }) {
     <div className="bg-gray-800 rounded-2xl overflow-hidden shadow-lg border border-gray-700 hover:border-[#FF9980] transition-all duration-300 transform hover:-translate-y-1 flex flex-col h-full group">
       {/* Imagen clickeable que lleva al detalle */}
       <Link href={`/producto/${product.id}`} className="h-56 overflow-hidden relative block cursor-pointer">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img 
-          src={product.image} 
-          alt={product.name} 
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+        <Image
+          src={product.image}
+          alt={product.name}
+          fill
+          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-110"
         />
         <div className="absolute top-3 left-3">
           <span className="bg-gray-900/80 text-[#FF9980] text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider backdrop-blur-sm border border-[#FF9980]/30">

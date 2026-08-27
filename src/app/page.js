@@ -1,20 +1,35 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import ProductCard from '@/components/ProductCard';
+import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 
 // ATENCIÓN: Eliminamos la importación del Navbar y el Footer porque ya están en layout.js (esto causaba que se vean dobles)
 
 export default function HomePage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [categoriaActiva, setCategoriaActiva] = useState('Todas');
-  const [search, setSearch] = useState('');
-  const [orden, setOrden] = useState('Novedades');
-  
-  // Nuevo estado para controlar si el menú de tres rayitas está abierto
+
+  // Inicializar estado desde URL params
+  const [categoriaActiva, setCategoriaActiva] = useState(() => searchParams.get('cat') || 'Todas');
+  const [search, setSearch] = useState(() => searchParams.get('q') || '');
+  const [orden, setOrden] = useState(() => searchParams.get('orden') || 'Novedades');
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
+
+  // Sincronizar estado con URL (sin recargar la página)
+  const syncUrl = useCallback((newSearch, newCat, newOrden) => {
+    const params = new URLSearchParams();
+    if (newSearch) params.set('q', newSearch);
+    if (newCat && newCat !== 'Todas') params.set('cat', newCat);
+    if (newOrden && newOrden !== 'Novedades') params.set('orden', newOrden);
+    const query = params.toString();
+    router.replace(query ? `/?${query}` : '/', { scroll: false });
+  }, [router]);
 
   useEffect(() => {
     const fetchProductos = async () => {
@@ -32,29 +47,54 @@ export default function HomePage() {
     fetchProductos();
   }, []);
 
+  // Handlers que actualizan estado Y URL
+  const handleSearchChange = (val) => {
+    setSearch(val);
+    syncUrl(val, categoriaActiva, orden);
+  };
+  const handleCatChange = (cat) => {
+    setCategoriaActiva(cat);
+    setIsCategoryMenuOpen(false);
+    syncUrl(search, cat, orden);
+  };
+  const handleOrdenChange = (val) => {
+    setOrden(val);
+    syncUrl(search, categoriaActiva, val);
+  };
+
   const categorias = ['Todas', ...new Set(productos.map(p => p.category).filter(Boolean))];
 
-  // Aplicar filtros de categoría y búsqueda
+  // Filtros y ordenamiento
   let productosFiltrados = productos.filter(p => {
     const coincideCategoria = categoriaActiva === 'Todas' || p.category === categoriaActiva;
     const coincideBusqueda = p.name.toLowerCase().includes(search.toLowerCase());
     return coincideCategoria && coincideBusqueda;
   });
 
-  // Aplicar ordenamiento
-  if (orden === 'Menor Precio') {
-    productosFiltrados.sort((a, b) => a.price - b.price);
-  } else if (orden === 'Mayor Precio') {
-    productosFiltrados.sort((a, b) => b.price - a.price);
-  }
+  if (orden === 'Menor Precio') productosFiltrados.sort((a, b) => a.price - b.price);
+  else if (orden === 'Mayor Precio') productosFiltrados.sort((a, b) => b.price - a.price);
 
-  // Filtrar los destacados
   const productosDestacados = productos.filter(p => p.featured === true);
 
+  // SKELETON: Durante la carga mostramos cards grises en lugar del spinner
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0B0D14] flex flex-col items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#FF9980]"></div>
+      <div className="min-h-screen bg-[#0B0D14] flex flex-col font-sans text-gray-100">
+        <main className="flex-grow max-w-6xl mx-auto w-full p-4 sm:p-6 mt-6">
+          {/* Hero skeleton */}
+          <div className="bg-[#1A1D24] rounded-[2rem] p-8 sm:p-12 mb-8 animate-pulse">
+            <div className="h-4 w-32 bg-gray-700 rounded-full mb-6" />
+            <div className="h-10 w-3/4 bg-gray-700 rounded-xl mb-4" />
+            <div className="h-10 w-1/2 bg-gray-700 rounded-xl mb-4" />
+            <div className="h-4 w-2/3 bg-gray-700 rounded-full" />
+          </div>
+          {/* Grid de skeletons */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <ProductCardSkeleton key={i} />
+            ))}
+          </div>
+        </main>
       </div>
     );
   }
@@ -98,10 +138,7 @@ export default function HomePage() {
                   {categorias.map(cat => (
                     <button 
                       key={cat} 
-                      onClick={() => {
-                        setCategoriaActiva(cat);
-                        setIsCategoryMenuOpen(false);
-                      }}
+                      onClick={() => handleCatChange(cat)}
                       className={`text-left px-4 py-2.5 text-sm font-bold transition-colors ${
                         categoriaActiva === cat 
                         ? 'bg-[#FF9980]/10 text-[#FF9980] border-l-2 border-[#FF9980]' 
@@ -124,7 +161,7 @@ export default function HomePage() {
                 type="text" 
                 placeholder="Buscar productos..." 
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="w-full bg-[#0B0D14] rounded-xl pl-12 pr-4 h-12 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#FF9980] transition-shadow placeholder-gray-600"
               />
             </div>
@@ -135,7 +172,7 @@ export default function HomePage() {
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 mr-2 sm:hidden"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
               <select 
                 value={orden} 
-                onChange={(e) => setOrden(e.target.value)}
+                onChange={(e) => handleOrdenChange(e.target.value)}
                 className="bg-transparent text-gray-300 text-sm font-bold focus:outline-none cursor-pointer appearance-none pr-4"
               >
                 <option value="Novedades">Novedades</option>
@@ -180,7 +217,7 @@ export default function HomePage() {
               <h3 className="text-xl font-bold text-white mb-2">No se encontraron productos</h3>
               <p className="text-gray-500 text-sm">Intentá con otra búsqueda o categoría.</p>
               <button 
-                onClick={() => { setSearch(''); setCategoriaActiva('Todas'); }}
+                onClick={() => { handleSearchChange(''); handleCatChange('Todas'); }}
                 className="mt-6 bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-6 py-2 rounded-xl transition-transform transform hover:-translate-y-1"
               >
                 Ver todo el catálogo
