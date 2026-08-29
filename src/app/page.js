@@ -82,10 +82,10 @@ export default function HomePage() {
       <div className="min-h-screen bg-[#0B0D14] flex flex-col font-sans text-gray-100">
         <main className="flex-grow max-w-6xl mx-auto w-full p-4 sm:p-6 mt-6">
           {/* Hero skeleton */}
-          <div className="bg-[#1A1D24] rounded-[2rem] p-8 sm:p-12 mb-8 animate-pulse">
+          <div className="bg-[#1A1D24] rounded-[2rem] p-6 sm:p-12 mb-8 animate-pulse">
             <div className="h-4 w-32 bg-gray-700 rounded-full mb-6" />
-            <div className="h-10 w-3/4 bg-gray-700 rounded-xl mb-4" />
-            <div className="h-10 w-1/2 bg-gray-700 rounded-xl mb-4" />
+            <div className="h-8 sm:h-10 w-3/4 bg-gray-700 rounded-xl mb-4" />
+            <div className="h-8 sm:h-10 w-1/2 bg-gray-700 rounded-xl mb-4" />
             <div className="h-4 w-2/3 bg-gray-700 rounded-full" />
           </div>
           {/* Grid de skeletons */}
@@ -104,16 +104,16 @@ export default function HomePage() {
       
       <main className="flex-grow max-w-6xl mx-auto w-full p-4 sm:p-6 mt-6">
 
-        {/* HERO BANNER ORIGINAL */}
-        <div className="bg-[#1A1D24] rounded-[2rem] p-8 sm:p-12 mb-8 shadow-xl">
-          <span className="bg-[#FF9980]/10 text-[#FF9980] px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest mb-6 inline-block">
+        {/* HERO BANNER */}
+        <div className="bg-[#1A1D24] rounded-[2rem] p-6 sm:p-12 mb-8 shadow-xl">
+          <span className="bg-[#FF9980]/10 text-[#FF9980] px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest mb-4 sm:mb-6 inline-block">
             Catálogo Online
           </span>
-          <h1 className="text-4xl sm:text-5xl font-black text-white mb-4 leading-tight tracking-tight">
+          <h1 className="text-3xl sm:text-5xl font-black text-white mb-3 sm:mb-4 leading-tight tracking-tight">
             Todo lo que buscás,<br />
             <span className="text-[#FF9980]">en un solo lugar.</span>
           </h1>
-          <p className="text-gray-400 text-sm sm:text-base max-w-md leading-relaxed mt-4">
+          <p className="text-gray-400 text-sm sm:text-base max-w-md leading-relaxed mt-3 sm:mt-4">
             Envíos a toda Córdoba Capital. Explorá nuestro catálogo y comprá seguro desde casa.
           </p>
         </div>

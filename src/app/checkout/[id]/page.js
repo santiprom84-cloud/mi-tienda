@@ -210,7 +210,7 @@ export default function DynamicCheckoutPage() {
 
   // --- PANTALLA DE FORMULARIO ---
   return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-8 mt-10 mb-20 animate-fade-in">
+    <div className="max-w-5xl mx-auto p-4 sm:p-8 mt-6 sm:mt-10 mb-20 animate-fade-in">
       <div className="text-center mb-10">
         <h1 className="text-3xl sm:text-4xl font-black text-white mb-3">Finalizar Compra</h1>
         <p className="text-gray-400">Verificá tu pedido y decinos a qué nombre lo reservamos.</p>
@@ -254,7 +254,7 @@ export default function DynamicCheckoutPage() {
         </div>
 
         <div className="lg:col-span-2">
-          <div className="bg-gray-900 p-6 sm:p-8 rounded-3xl border border-gray-800 shadow-xl sticky top-24">
+          <div className="bg-gray-900 p-5 sm:p-8 rounded-3xl border border-gray-800 shadow-xl sticky top-24">
             <h2 className="text-[#FF9980] font-black uppercase tracking-widest text-sm mb-6 border-b border-gray-800 pb-4">Tus Datos</h2>
             
             <form onSubmit={handleSubmit} className="space-y-6">

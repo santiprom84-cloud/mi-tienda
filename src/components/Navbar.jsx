@@ -24,9 +24,9 @@ export default function Navbar() {
         <div className="flex justify-between items-center h-20">
           
           {/* LOGO PRINCIPAL */}
-          <Link href="/" className="flex items-center gap-2 shrink-0">
-            <span className="text-2xl sm:text-3xl">🏪</span>
-            <span className="text-xl sm:text-3xl font-black text-gray-900 tracking-tighter">
+          <Link href="/" className="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
+            <span className="text-xl sm:text-2xl">🏪</span>
+            <span className="text-lg sm:text-3xl font-black text-gray-900 tracking-tighter truncate">
               Polirubro<span className="text-white">Online</span>
             </span>
           </Link>
