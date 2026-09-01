@@ -18,10 +18,14 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('pedidos'); 
   const [adminProductSearch, setAdminProductSearch] = useState('');
 
-  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
-  const [aiPromptText, setAiPromptText] = useState('');
-  const [aiResponseText, setAiResponseText] = useState('');
-  const [isApplyingAI, setIsApplyingAI] = useState(false);
+  // Estado para auto-clasificación masiva
+  const [isAutoClassifying, setIsAutoClassifying] = useState(false);
+  const [autoClassifyProgress, setAutoClassifyProgress] = useState({ done: 0, total: 0 });
+
+  // Estado para sugerencia de IA en el formulario individual
+  const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
+  const [categoryIsAISuggested, setCategoryIsAISuggested] = useState(false);
+  const [aiSuggestTimeout, setAiSuggestTimeout] = useState(null);
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -111,61 +115,86 @@ export default function AdminDashboard() {
     }
   };
 
-  const openAIModal = () => {
-    const productsToClassify = adminProducts.map(p => ({ id: p.id, name: p.name }));
-    const prompt = `Eres un experto en e-commerce. Analiza estos productos y asígnales una categoría principal.
-Usa estas sugerencias base: "Tecnología y Gaming", "Bazar y Parrilla", "Deportes y Tiempo Libre", "Librería y Estudio", "Accesorios y Telefonía", "Indumentaria", "Juguetería".
-Devuelve SOLO un JSON válido (sin texto antes ni después) con este formato exacto:
-[
-  {"id": "el_id_aqui", "category": "Categoria Asignada"}
-]
+  // Sugiere categoría automáticamente al escribir el nombre del producto
+  const suggestCategoryWithAI = (name, description, imageUrl) => {
+    if (aiSuggestTimeout) clearTimeout(aiSuggestTimeout);
+    if (!name || name.trim().length < 4) return;
 
-PRODUCTOS:
-${JSON.stringify(productsToClassify)}`;
+    const timeout = setTimeout(async () => {
+      setIsSuggestingCategory(true);
+      try {
+        const res = await fetch('/api/categorizar-producto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim(), description, imageUrl }),
+        });
+        const data = await res.json();
+        if (data.category && data.category !== 'Sin Clasificar') {
+          setProductForm(prev => ({ ...prev, category: data.category, customCategory: '' }));
+          setCategoryIsAISuggested(true);
+        }
+      } catch (err) {
+        console.error('Error al sugerir categoría:', err);
+      } finally {
+        setIsSuggestingCategory(false);
+      }
+    }, 900); // Espera 900ms tras dejar de escribir
 
-    setAiPromptText(prompt);
-    setAiResponseText('');
-    setIsAIModalOpen(true);
+    setAiSuggestTimeout(timeout);
   };
 
-  const applyAIResponse = async () => {
-    if (!aiResponseText.trim()) {
-      alert("Pegá el JSON que te dio la IA primero.");
+  // Auto-clasifica TODOS los productos del inventario de una sola vez
+  const autoClassifyAll = async () => {
+    const productsToClassify = adminProducts.filter(
+      p => !p.category || p.category === 'Sin Clasificar' || p.category === 'Todas'
+    );
+
+    if (productsToClassify.length === 0) {
+      alert('✅ ¡Todos los productos ya tienen categoría asignada!');
       return;
     }
-    setIsApplyingAI(true);
-    try {
-      let cleanText = aiResponseText.replace(/```json/g, '').replace(/```/g, '').trim();
-      const clasificaciones = JSON.parse(cleanText);
 
-      if (!Array.isArray(clasificaciones)) {
-        throw new Error("El formato no es una lista válida.");
-      }
+    const confirmed = window.confirm(
+      `🧠 La IA va a clasificar ${productsToClassify.length} producto(s) sin categoría.\n¿Continuamos?`
+    );
+    if (!confirmed) return;
 
-      let procesados = 0;
-      for (const item of clasificaciones) {
-        if (item.id && item.category) {
-          await supabase.from('productos').update({ category: item.category.trim() }).eq('id', item.id);
+    setIsAutoClassifying(true);
+    setAutoClassifyProgress({ done: 0, total: productsToClassify.length });
+
+    let procesados = 0;
+    for (const product of productsToClassify) {
+      try {
+        const res = await fetch('/api/categorizar-producto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: product.name,
+            description: product.description || '',
+            imageUrl: product.image || '',
+          }),
+        });
+        const data = await res.json();
+        if (data.category && data.category !== 'Sin Clasificar') {
+          await supabase
+            .from('productos')
+            .update({ category: data.category })
+            .eq('id', product.id);
           procesados++;
         }
+      } catch (err) {
+        console.error(`Error clasificando producto ${product.name}:`, err);
       }
-
-      alert(`¡Modo Seguro Exitoso! Se reordenaron ${procesados} productos correctamente.`);
-      setIsAIModalOpen(false);
-      fetchAdminData();
-    } catch (error) {
-      alert(`Error leyendo el JSON: ${error.message}.`);
-    } finally {
-      setIsApplyingAI(false);
+      setAutoClassifyProgress(prev => ({ ...prev, done: prev.done + 1 }));
     }
-  };
 
-  const copyPromptToClipboard = () => {
-    navigator.clipboard.writeText(aiPromptText);
-    alert("¡Comando copiado! Pegalo en ChatGPT o Gemini.");
+    setIsAutoClassifying(false);
+    alert(`✅ ¡Listo! Se clasificaron ${procesados} de ${productsToClassify.length} productos.`);
+    fetchAdminData();
   };
 
   const openProductModal = (product = null) => {
+    setCategoryIsAISuggested(false);
     if (product) {
       const isKnownCategory = CATEGORIAS_BASE.includes(product.category);
       setEditingProduct(product);
@@ -176,7 +205,7 @@ ${JSON.stringify(productsToClassify)}`;
         customCategory: isKnownCategory ? '' : (product.category || ''), 
         image: product.image || '', 
         description: product.description || '',
-        featured: product.featured || false // Cargamos si es destacado
+        featured: product.featured || false
       });
     } else {
       setEditingProduct(null);
@@ -351,10 +380,21 @@ ${JSON.stringify(productsToClassify)}`;
               </div>
 
               <button 
-                onClick={openAIModal}
-                className="w-full sm:w-auto bg-[#FF9980]/20 hover:bg-[#FF9980]/30 text-[#FF9980] border border-[#FF9980]/50 font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2"
+                onClick={autoClassifyAll}
+                disabled={isAutoClassifying}
+                className="w-full sm:w-auto bg-[#FF9980]/20 hover:bg-[#FF9980]/30 text-[#FF9980] border border-[#FF9980]/50 font-black px-4 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none"
               >
-                🧠 Reordenar Catálogo
+                {isAutoClassifying ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    {autoClassifyProgress.done}/{autoClassifyProgress.total} clasificando...
+                  </>
+                ) : (
+                  <>🧠 Auto-clasificar sin categoría</>
+                )}
               </button>
 
               <button onClick={() => openProductModal()} className="w-full sm:w-auto bg-[#FF9980] hover:bg-[#ff8060] text-gray-900 font-black px-6 py-2.5 sm:py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2">
@@ -659,7 +699,19 @@ ${JSON.stringify(productsToClassify)}`;
 
                 <div>
                   <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Nombre del Producto *</label>
-                  <input type="text" required value={productForm.name} onChange={(e) => setProductForm({...productForm, name: e.target.value})} className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors" placeholder="Ej: Termo Stanley 1L" />
+                  <input
+                    type="text"
+                    required
+                    value={productForm.name}
+                    onChange={(e) => {
+                      const newName = e.target.value;
+                      setProductForm(prev => ({...prev, name: newName}));
+                      setCategoryIsAISuggested(false);
+                      suggestCategoryWithAI(newName, productForm.description, productForm.image);
+                    }}
+                    className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors"
+                    placeholder="Ej: Termo Stanley 1L"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -669,16 +721,43 @@ ${JSON.stringify(productsToClassify)}`;
                   </div>
                   
                   <div>
-                    <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider mb-2">Categoría *</label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-[#FF9980] font-black text-xs uppercase tracking-wider">Categoría *</label>
+                      {isSuggestingCategory && (
+                        <span className="flex items-center gap-1.5 text-xs text-purple-400 font-bold animate-pulse">
+                          <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                          </svg>
+                          IA analizando...
+                        </span>
+                      )}
+                      {categoryIsAISuggested && !isSuggestingCategory && (
+                        <span className="flex items-center gap-1 text-xs bg-purple-900/50 text-purple-300 border border-purple-700/50 px-2 py-0.5 rounded-full font-bold">
+                          ✨ Sugerida por IA
+                        </span>
+                      )}
+                    </div>
                     <select 
                       value={productForm.category} 
-                      onChange={(e) => setProductForm({...productForm, category: e.target.value})}
-                      className="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-gray-100 focus:outline-none focus:border-[#FF9980] transition-colors appearance-none cursor-pointer"
+                      onChange={(e) => {
+                        setProductForm(prev => ({...prev, category: e.target.value}));
+                        setCategoryIsAISuggested(false); // Si edita manualmente, quita el badge
+                      }}
+                      className={`w-full bg-gray-900 rounded-xl p-3 text-gray-100 focus:outline-none transition-colors appearance-none cursor-pointer ${
+                        categoryIsAISuggested
+                          ? 'border-2 border-purple-600 focus:border-purple-400'
+                          : 'border border-gray-600 focus:border-[#FF9980]'
+                      }`}
                     >
                       {CATEGORIAS_BASE.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
                     </select>
+
+                    {categoryIsAISuggested && !isSuggestingCategory && (
+                      <p className="text-xs text-gray-500 mt-1.5">Podés cambiarla con el selector si no estás de acuerdo.</p>
+                    )}
 
                     {productForm.category === 'Otra...' && (
                       <input 
@@ -712,8 +791,6 @@ ${JSON.stringify(productsToClassify)}`;
           </div>
         </div>
       )}
-
-      {/* MODAL: IA (Oculto por brevedad, está implementado en la app real) */}
 
       <style jsx global>{`
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
