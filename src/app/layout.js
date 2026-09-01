@@ -7,6 +7,7 @@ import { ToastProvider } from '@/context/ToastContext';
 import ToastContainer from '@/components/ToastContainer';
 import Navbar from '@/components/Navbar';
 import WhatsAppButton from '@/components/WhatsAppButton';
+import VisitTracker from '@/components/VisitTracker';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -48,6 +49,7 @@ export default function RootLayout({ children }) {
             
               <WhatsAppButton />
               <ToastContainer />
+              <VisitTracker />
               
             </CartProvider>
           </AuthProvider>

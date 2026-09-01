@@ -27,6 +27,12 @@ export default function AdminDashboard() {
   const [categoryIsAISuggested, setCategoryIsAISuggested] = useState(false);
   const [aiSuggestTimeout, setAiSuggestTimeout] = useState(null);
 
+  // Estado para estadísticas de visitas
+  const [visitasHoy, setVisitasHoy] = useState(null);
+  const [historialVisitas, setHistorialVisitas] = useState([]);
+  const [loadingVisitas, setLoadingVisitas] = useState(false);
+  const [isHistorialOpen, setIsHistorialOpen] = useState(false);
+
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   
@@ -65,6 +71,14 @@ export default function AdminDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loadingAuth, router]);
 
+  // Carga las estadísticas de visitas automáticamente cuando se abre la pestaña Radar
+  useEffect(() => {
+    if (activeTab === 'radar' && user?.email === ADMIN_EMAIL) {
+      fetchVisitorStats();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   const fetchAdminData = async () => {
     setLoading(true);
     try {
@@ -94,6 +108,22 @@ export default function AdminDashboard() {
       setActiveUsers(currentlyOnline);
     }).subscribe();
     return () => supabase.removeChannel(channel);
+  };
+
+  const fetchVisitorStats = async () => {
+    setLoadingVisitas(true);
+    try {
+      const res = await fetch('/api/visitas');
+      const data = await res.json();
+      if (!data.error) {
+        setVisitasHoy(data.visitasHoy);
+        setHistorialVisitas(data.historial || []);
+      }
+    } catch (err) {
+      console.error('Error cargando visitas:', err);
+    } finally {
+      setLoadingVisitas(false);
+    }
   };
 
   const updateOrderStatus = async (id, newStatus) => {
@@ -582,48 +612,233 @@ export default function AdminDashboard() {
       {/* ===================== TAB: RADAR EN VIVO ===================== */}
       {activeTab === 'radar' && (
         <div className="space-y-6 animate-fade-in">
-          <div className="bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-lg">
-            <div className="flex items-center gap-3 mb-2">
+
+          {/* Header con título y botones */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-lg gap-4">
+            <div className="flex items-center gap-3">
               <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
               </span>
-              <h2 className="text-xl font-black text-white">Radar en Vivo</h2>
+              <div>
+                <h2 className="text-xl font-black text-white">Radar en Vivo</h2>
+                <p className="text-gray-400 text-sm">Usuarios activos ahora + métricas del día.</p>
+              </div>
             </div>
-            <p className="text-gray-400 text-sm">Usuarios con sesión activa en este momento.</p>
+            <div className="flex gap-3 w-full sm:w-auto">
+              <button
+                onClick={fetchVisitorStats}
+                disabled={loadingVisitas}
+                className="flex-1 sm:flex-none bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                Actualizar
+              </button>
+              <button
+                onClick={() => { fetchVisitorStats(); setIsHistorialOpen(true); }}
+                className="flex-1 sm:flex-none bg-[#FF9980]/20 hover:bg-[#FF9980]/30 text-[#FF9980] border border-[#FF9980]/50 font-black px-4 py-2 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                📅 Historial
+              </button>
+            </div>
           </div>
 
+          {/* Cards de métricas */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+            {/* Card: Visitas hoy */}
+            <div className="bg-gray-800 border border-[#FF9980]/30 rounded-2xl p-6 shadow-lg relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-[#FF9980]/5 rounded-bl-full"></div>
+              <p className="text-xs text-[#FF9980] font-black uppercase tracking-wider mb-1">Visitas hoy</p>
+              {loadingVisitas ? (
+                <div className="animate-pulse h-10 w-20 bg-gray-700 rounded-lg mt-1"></div>
+              ) : (
+                <p className="text-5xl font-black text-white leading-none">
+                  {visitasHoy ?? '—'}
+                </p>
+              )}
+              <p className="text-gray-500 text-xs mt-2">Dispositivos únicos</p>
+              {/* Variación vs ayer */}
+              {!loadingVisitas && historialVisitas.length >= 2 && (() => {
+                const ayer = historialVisitas[1]?.visitas || 0;
+                const hoy = historialVisitas[0]?.visitas || 0;
+                if (ayer === 0) return null;
+                const diff = Math.round(((hoy - ayer) / ayer) * 100);
+                return (
+                  <span className={`inline-flex items-center gap-1 text-xs font-bold mt-2 px-2 py-0.5 rounded-full ${
+                    diff >= 0 ? 'bg-green-900/40 text-green-400' : 'bg-red-900/40 text-red-400'
+                  }`}>
+                    {diff >= 0 ? '↑' : '↓'} {Math.abs(diff)}% vs ayer
+                  </span>
+                );
+              })()}
+            </div>
+
+            {/* Card: En línea ahora */}
+            <div className="bg-gray-800 border border-green-500/20 rounded-2xl p-6 shadow-lg relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-bl-full"></div>
+              <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-green-500 animate-ping"></div>
+              <p className="text-xs text-green-400 font-black uppercase tracking-wider mb-1">En línea ahora</p>
+              <p className="text-5xl font-black text-white leading-none">{activeUsers.length}</p>
+              <p className="text-gray-500 text-xs mt-2">Con sesión iniciada</p>
+            </div>
+
+            {/* Card: Mejor día */}
+            <div className="bg-gray-800 border border-purple-500/20 rounded-2xl p-6 shadow-lg relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-bl-full"></div>
+              <p className="text-xs text-purple-400 font-black uppercase tracking-wider mb-1">Récord (60 días)</p>
+              {loadingVisitas ? (
+                <div className="animate-pulse h-10 w-20 bg-gray-700 rounded-lg mt-1"></div>
+              ) : (
+                <p className="text-5xl font-black text-white leading-none">
+                  {historialVisitas.length > 0 ? Math.max(...historialVisitas.map(d => d.visitas)) : '—'}
+                </p>
+              )}
+              <p className="text-gray-500 text-xs mt-2">Visitas en un día</p>
+            </div>
+          </div>
+
+          {/* Lista de usuarios activos en tiempo real */}
           {activeUsers.length === 0 ? (
-            <div className="text-center py-20 bg-gray-800 rounded-2xl border border-gray-700">
+            <div className="text-center py-16 bg-gray-800 rounded-2xl border border-gray-700">
               <span className="text-5xl block mb-4 opacity-50">📡</span>
               <p className="text-gray-400 font-bold text-lg">Nadie conectado ahora mismo</p>
-              <p className="text-gray-600 text-sm mt-2">Los usuarios aparecerán aquí cuando naveguen la tienda con sesión iniciada.</p>
+              <p className="text-gray-600 text-sm mt-2">Los usuarios con sesión aparecerán acá cuando naveguen la tienda.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeUsers.map((u, i) => (
-                <div key={i} className="bg-gray-800 border border-green-500/20 rounded-2xl p-5 shadow-lg relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/5 rounded-bl-full"></div>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="bg-gray-900 w-10 h-10 rounded-full flex items-center justify-center border border-gray-700 shrink-0">
-                      <span className="text-lg">👤</span>
+            <div>
+              <h3 className="text-sm font-black text-gray-400 uppercase tracking-wider mb-3">Usuarios activos ahora</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {activeUsers.map((u, i) => (
+                  <div key={i} className="bg-gray-800 border border-green-500/20 rounded-2xl p-5 shadow-lg relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/5 rounded-bl-full"></div>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="bg-gray-900 w-10 h-10 rounded-full flex items-center justify-center border border-gray-700 shrink-0">
+                        <span className="text-lg">👤</span>
+                      </div>
+                      <div className="overflow-hidden">
+                        <p className="text-gray-100 font-bold text-sm truncate">{u.email || 'Anónimo'}</p>
+                        <span className="text-green-400 text-xs font-bold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span> En línea
+                        </span>
+                      </div>
                     </div>
-                    <div className="overflow-hidden">
-                      <p className="text-gray-100 font-bold text-sm truncate">{u.email || 'Anónimo'}</p>
-                      <span className="text-green-400 text-xs font-bold flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span> En línea
-                      </span>
-                    </div>
+                    {u.online_at && (
+                      <p className="text-gray-600 text-xs">
+                        Desde: {new Date(u.online_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
                   </div>
-                  {u.online_at && (
-                    <p className="text-gray-600 text-xs">
-                      Desde: {new Date(u.online_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* MODAL: HISTORIAL DE VISITAS */}
+      {isHistorialOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsHistorialOpen(false)}></div>
+          <div className="relative bg-gray-800 w-full max-w-2xl rounded-3xl border border-gray-700 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+
+            {/* Header */}
+            <div className="bg-gray-900 p-6 border-b border-gray-700 flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="text-xl font-black text-white flex items-center gap-2">
+                  📅 Historial de Visitas
+                </h3>
+                <p className="text-gray-400 text-sm mt-0.5">Dispositivos únicos por día — últimos 60 días</p>
+              </div>
+              <button onClick={() => setIsHistorialOpen(false)} className="text-gray-400 hover:text-white bg-gray-800 hover:bg-red-500/20 p-2 rounded-lg transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+
+            {/* Tabla */}
+            <div className="overflow-y-auto custom-scrollbar flex-grow">
+              {loadingVisitas ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-b-4 border-[#FF9980]"></div>
+                </div>
+              ) : historialVisitas.length === 0 ? (
+                <div className="text-center py-16">
+                  <span className="text-4xl block mb-3">📊</span>
+                  <p className="text-gray-400 font-bold">Aún no hay datos de visitas</p>
+                  <p className="text-gray-600 text-sm mt-1">Empezarán a aparecer cuando alguien visite la tienda</p>
+                </div>
+              ) : (
+                <table className="w-full text-sm text-gray-300">
+                  <thead className="bg-gray-900 text-xs uppercase text-gray-500 border-b border-gray-700 sticky top-0">
+                    <tr>
+                      <th className="px-6 py-4 text-left font-black">Fecha</th>
+                      <th className="px-6 py-4 text-center font-black">Visitas únicas</th>
+                      <th className="px-6 py-4 text-center font-black">vs día anterior</th>
+                      <th className="px-6 py-4 text-right font-black">Barra</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historialVisitas.map((dia, i) => {
+                      const diaAnterior = historialVisitas[i + 1]?.visitas || 0;
+                      const maxVisitas = Math.max(...historialVisitas.map(d => d.visitas));
+                      const pct = maxVisitas > 0 ? Math.round((dia.visitas / maxVisitas) * 100) : 0;
+                      let variacion = null;
+                      if (diaAnterior > 0) {
+                        const diff = Math.round(((dia.visitas - diaAnterior) / diaAnterior) * 100);
+                        variacion = { diff, sube: diff >= 0 };
+                      }
+                      // Formateamos la fecha a dd/MM/yyyy
+                      const [y, m, d] = dia.fecha.split('-');
+                      const fechaStr = `${d}/${m}/${y}`;
+                      const esHoy = i === 0;
+                      return (
+                        <tr key={dia.fecha} className={`border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors ${
+                          esHoy ? 'bg-[#FF9980]/5' : ''
+                        }`}>
+                          <td className="px-6 py-3">
+                            <span className="font-bold text-gray-100">{fechaStr}</span>
+                            {esHoy && (
+                              <span className="ml-2 text-xs bg-[#FF9980]/20 text-[#FF9980] border border-[#FF9980]/30 px-1.5 py-0.5 rounded-full font-bold">hoy</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-3 text-center">
+                            <span className="font-black text-white text-base">{dia.visitas}</span>
+                          </td>
+                          <td className="px-6 py-3 text-center">
+                            {variacion ? (
+                              <span className={`text-xs font-black px-2 py-0.5 rounded-full ${
+                                variacion.sube ? 'bg-green-900/40 text-green-400' : 'bg-red-900/40 text-red-400'
+                              }`}>
+                                {variacion.sube ? '↑' : '↓'} {Math.abs(variacion.diff)}%
+                              </span>
+                            ) : (
+                              <span className="text-gray-600 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="w-24 bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className="h-1.5 rounded-full bg-gradient-to-r from-[#FF9980] to-[#ff6040] transition-all"
+                                  style={{ width: `${pct}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="bg-gray-900 px-6 py-4 border-t border-gray-700 flex justify-between items-center shrink-0">
+              <p className="text-gray-500 text-xs">Total registrado: <span className="text-white font-bold">{historialVisitas.reduce((s, d) => s + d.visitas, 0)} visitas</span></p>
+              <button onClick={() => setIsHistorialOpen(false)} className="text-gray-400 hover:text-white font-bold text-sm transition-colors">Cerrar</button>
+            </div>
+          </div>
         </div>
       )}
 
