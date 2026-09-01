@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Usamos el service role para escribir sin restricciones de RLS
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Evita que Next.js intente evaluar esta ruta en tiempo de build
+export const dynamic = 'force-dynamic';
+
+// Crea el cliente dentro de cada request para que las env vars estén disponibles
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+}
 
 // POST: registra una visita (upsert — si ya visitó hoy, no duplica)
 export async function POST(request) {
@@ -20,6 +25,7 @@ export async function POST(request) {
     const ahoraArgentina = new Date(Date.now() - 3 * 60 * 60 * 1000);
     const fecha = ahoraArgentina.toISOString().split('T')[0]; // "2026-09-01"
 
+    const supabase = getSupabase();
     const { error } = await supabase
       .from('visitas')
       .upsert({ session_id, fecha }, { onConflict: 'session_id,fecha', ignoreDuplicates: true });
@@ -48,6 +54,7 @@ export async function GET() {
     const desde = hace60.toISOString().split('T')[0];
 
     // Traemos todas las visitas de los últimos 60 días y agrupamos en JS
+    const supabase = getSupabase();
     const { data, error } = await supabase
       .from('visitas')
       .select('fecha')
