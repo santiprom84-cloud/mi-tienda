@@ -20,14 +20,18 @@ export default function Navbar() {
   const isAdmin = user?.email === 'santiprom84@gmail.com';
   const isHome = pathname === '/';
 
+  // Cerrar dropdown al cambiar de ruta
+  useEffect(() => { setIsDropdownOpen(false); }, [pathname]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    // Use 'click' (not 'mousedown') so Link navigation fires first
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
   return (
