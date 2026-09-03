@@ -1,9 +1,12 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 
 const AuthContext = createContext();
+
+// Creamos el cliente una sola vez (singleton en el browser)
+const supabase = createClient();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -27,7 +30,6 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (mounted) {
         setUser(session?.user ?? null);
-        // Si aún estaba cargando, terminar el loading
         setLoadingAuth(false);
       }
     });

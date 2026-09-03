@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+
+const supabase = createClient();
 
 export default function AdminDashboard() {
   const { user, loadingAuth } = useAuth();
