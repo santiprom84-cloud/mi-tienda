@@ -10,21 +10,34 @@ export function AuthProvider({ children }) {
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
+    // Solo getSession() decide cuando termina el loading inicial
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
-      setLoadingAuth(false);
+      if (mounted) {
+        setUser(session?.user || null);
+        setLoadingAuth(false);
+      }
     };
     
     getSession();
 
+    // onAuthStateChange solo actualiza el usuario DESPUÉS de que ya cargó
+    // NO setea loadingAuth para evitar el race condition
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-      setLoadingAuth(false);
+      if (mounted) {
+        setUser(session?.user || null);
+        // NO llamamos setLoadingAuth(false) acá
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
+
 
   // NUEVO: Sistema de Presencia (Radar de usuarios online)
   useEffect(() => {
