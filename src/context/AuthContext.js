@@ -12,23 +12,23 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true;
 
-    // Solo getSession() decide cuando termina el loading inicial
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    // getUser() valida el token con el servidor (más seguro que getSession())
+    const initAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
       if (mounted) {
-        setUser(session?.user || null);
+        setUser(user ?? null);
         setLoadingAuth(false);
       }
     };
-    
-    getSession();
 
-    // onAuthStateChange solo actualiza el usuario DESPUÉS de que ya cargó
-    // NO setea loadingAuth para evitar el race condition
+    initAuth();
+
+    // Escucha cambios de sesión (login, logout, refresh de token)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (mounted) {
-        setUser(session?.user || null);
-        // NO llamamos setLoadingAuth(false) acá
+        setUser(session?.user ?? null);
+        // Si aún estaba cargando, terminar el loading
+        setLoadingAuth(false);
       }
     });
 
@@ -38,18 +38,15 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-
-  // NUEVO: Sistema de Presencia (Radar de usuarios online)
+  // Sistema de Presencia (Radar de usuarios online)
   useEffect(() => {
     let presenceChannel;
-    
+
     if (user) {
-      // Nos unimos al canal global de usuarios online
       presenceChannel = supabase.channel('online-users');
-      
+
       presenceChannel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          // Avisamos al servidor quiénes somos y que entramos
           await presenceChannel.track({
             email: user.email,
             online_at: new Date().toISOString(),
