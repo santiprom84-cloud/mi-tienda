@@ -84,10 +84,23 @@ export default function PerfilPage() {
   const [savingPwd,   setSavingPwd]   = useState(false);
   const [msgPwd,      setMsgPwd]      = useState(null);
 
-  // Auth guard
+  // Auth guard: redirige si no hay sesión
   useEffect(() => {
-    if (!loadingAuth && !user) router.push('/login');
-    if (user) { fetchProfile(); fetchOrders(); }
+    if (!loadingAuth && !user) {
+      router.push('/login');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, loadingAuth]);
+
+  // Carga datos del perfil y pedidos cuando el user está disponible
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
+      fetchOrders();
+    } else if (!loadingAuth) {
+      // No hay usuario y auth ya terminó: salimos del loading
+      setLoadingProfile(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loadingAuth]);
 
@@ -183,7 +196,8 @@ export default function PerfilPage() {
     }
   };
 
-  if (loadingAuth || loadingProfile) {
+  // Muestra spinner mientras auth o datos del perfil están cargando
+  if (loadingAuth || (user && loadingProfile)) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center gap-4">
         <div className="animate-spin rounded-full h-14 w-14 border-t-4 border-b-4 border-[#FF9980]" />
